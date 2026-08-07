@@ -27,3 +27,18 @@ def signin(request):
         return redirect("ecommerce:home")
 
     return render(request, "ecommerce/signin.html", {"form": form})
+
+def products(request):
+    return render(request, "ecommerce/products.html")
+
+def categories(request):
+    return render(request, "ecommerce/categories.html")
+
+def myorders(request):
+    return render(request, "ecommerce/myorders.html")
+
+def profile(request):
+    return render(request, "ecommerce/profile.html")
+
+def cart(request):
+    return render(request, "ecommerce/cart.html")
