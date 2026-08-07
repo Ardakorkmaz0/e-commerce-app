@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sign In{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/signin.css' %}">
+{% endblock %}
+
+{% block body_class %}d-flex align-items-center min-vh-100 bg-body-tertiary{% endblock %}
+
+{% block content %}
+    <main class="form-signin w-100 m-auto">
+        <form method="post">
+            {% csrf_token %}
+            <img
+                class="signin-logo mb-4"
+                src="{% static 'images/logo.png' %}"
+                alt="E-Commerce logo"
+                width="160"
+                height="160"
+            >
+            <h1 class="h3 mb-3 fw-normal text-center"></h1>
+
+            {% if form.errors %}
+                <div class="alert alert-danger" role="alert">
+                    Invalid username or password.
+                </div>
+            {% endif %}
+
+            <div class="form-floating">
+                <input
+                    type="text"
+                    class="form-control"
+                    id="floatingUsername"
+                    name="username"
+                    placeholder="Username"
+                    value="{{ form.username.value|default_if_none:'' }}"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+                <label for="floatingUsername">Username</label>
+            </div>
+
+            <div class="form-floating">
+                <input
+                    type="password"
+                    class="form-control"
+                    id="floatingPassword"
+                    name="password"
+                    placeholder="Password"
+                    autocomplete="current-password"
+                    required
+                >
+                <label for="floatingPassword">Password</label>
+            </div>
+
+            <div class="form-check text-start my-3">
+                <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="remember_me"
+                    id="rememberMe"
+                >
+                <label class="form-check-label" for="rememberMe">Remember me</label>
+            </div>
+
+            <button class="btn btn-primary w-100 py-2" type="submit">Sign in</button> <br> <br>
+            <div class="text-center">
+                <label for="signup" class="form-label">Don't have an account?    </label>
+                <button type="button" class="btn btn-secondary" style="background-color: #0db41a;">Sign Up</button>
+            </div>
+
+            <p class="mt-5 mb-3 text-body-secondary text-center">E-Commerce</p>
+        </form>
+    </main>
+{% endblock %}

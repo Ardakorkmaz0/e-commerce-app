@@ -16,8 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('', include('ecommerce.urls')),
+    path(
+        'admin/login/',
+        RedirectView.as_view(pattern_name='ecommerce:signin', permanent=False),
+        name='admin-login-redirect',
+    ),
     path('admin/', admin.site.urls),
 ]

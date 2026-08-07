@@ -4,4 +4,5 @@ app_name = 'ecommerce'
 
 urlpatterns = [
 	path('', views.home, name='home'),
+    path('signin/', views.signin, name='signin'),
 ]
