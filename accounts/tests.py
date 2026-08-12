@@ -1,3 +1,89 @@
-from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 
-# Create your tests here.
+
+User = get_user_model()
+
+
+class RegisterApiTests(APITestCase):
+    def setUp(self):
+        self.url = reverse("accounts_api:register")
+        self.payload = {
+            "username": "newcustomer",
+            "email": "Customer@Example.com",
+            "first_name": "New",
+            "last_name": "Customer",
+            "password": "StrongPass!2026",
+            "password_confirm": "StrongPass!2026",
+        }
+
+    def test_registers_user_and_hashes_password(self):
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username="newcustomer")
+        self.assertEqual(user.email, "customer@example.com")
+        self.assertEqual(user.first_name, "New")
+        self.assertEqual(user.last_name, "Customer")
+        self.assertTrue(user.check_password(self.payload["password"]))
+        self.assertNotIn("password", response.data)
+        self.assertNotIn("password_confirm", response.data)
+
+    def test_rejects_duplicate_username_case_insensitively(self):
+        User.objects.create_user(
+            username="NewCustomer",
+            email="existing@example.com",
+            password="StrongPass!2026",
+        )
+
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("username", response.data)
+
+    def test_rejects_duplicate_email_case_insensitively(self):
+        User.objects.create_user(
+            username="existing",
+            email="customer@example.com",
+            password="StrongPass!2026",
+        )
+
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    def test_rejects_password_mismatch(self):
+        self.payload["password_confirm"] = "DifferentPass!2026"
+
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password_confirm", response.data)
+        self.assertFalse(User.objects.filter(username="newcustomer").exists())
+
+    def test_rejects_weak_password(self):
+        self.payload["password"] = "123"
+        self.payload["password_confirm"] = "123"
+
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+        self.assertFalse(User.objects.filter(username="newcustomer").exists())
+
+    def test_does_not_allow_privilege_escalation(self):
+        payload = {
+            **self.payload,
+            "is_staff": True,
+            "is_superuser": True,
+        }
+
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username="newcustomer")
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)

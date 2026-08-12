@@ -218,6 +218,10 @@ body {
   backdrop-filter: blur(18px);
 }
 
+.signup-form {
+  max-width: 520px;
+}
+
 .signin-logo {
   display: block;
   width: 136px;
@@ -253,6 +257,14 @@ body {
 .form-signin .form-control:focus {
   border-color: var(--site-focus);
   box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.signup-field {
+  margin-bottom: 0.75rem;
+}
+
+.signup-field .form-control {
+  border-radius: 0.375rem !important;
 }
 
 .form-signin .form-check-input:checked {
