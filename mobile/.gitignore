@@ -1,37 +1,47 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Flutter and Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+/build/
+/coverage/
+**/doc/api/
+**/Flutter/ephemeral/
+**/.plugin_symlinks/
+**/ios/Flutter/.last_build_id
 migrate_working_dir/
 
-# IntelliJ related
+# IDE and editor files
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
+*.swp
+.atom/
+.history/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Temporary files and logs
+*.class
+*.log
+*.pyc
+*~
+.build/
+.buildlog/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.svn/
+.swiftpm/
 
 # Symbolication related
 app.*.symbols

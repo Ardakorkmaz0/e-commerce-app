@@ -1,5 +1,97 @@
-# Local project plan (intentionally untracked)
+# Local project plan
 /README
 
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Python and Django
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+.eggs/
+/media/
+/staticfiles/
+
+# JavaScript, Node.js, and Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.nyc_output/
+.turbo/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Flutter and Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+**/doc/api/
+app.*.symbols
+app.*.map.json
+
+# Android and Gradle
+.gradle/
+.kotlin/
+.cxx/
+captures/
+local.properties
+GeneratedPluginRegistrant.java
+key.properties
+*.jks
+*.keystore
+
+# Runtime files and logs
 .runtime/
+*.log
+*.pid
+*.pid.lock
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*~
+tempCodeRunnerFile.*
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local database files
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-shm
+*.sqlite3-wal
