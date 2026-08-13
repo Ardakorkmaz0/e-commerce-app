@@ -346,3 +346,155 @@ body {
     border-radius: 20px;
   }
 }
+
+/* ── Store pages — mirrors the mobile app's screens ─────────────────── */
+
+.section-title {
+  color: var(--site-text);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Home search — same pill shape as the navbar search */
+.store-search .form-control {
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border-color: var(--site-border);
+  border-right: 0;
+  border-radius: 999px 0 0 999px;
+}
+
+.store-search .form-control:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.store-search .btn {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--site-action-start), var(--site-action-end));
+  border: 1px solid transparent;
+  border-radius: 0 999px 999px 0;
+  font-weight: 700;
+}
+
+/* Category chips — Flutter FilterChip equivalent */
+.category-chip {
+  display: inline-block;
+  padding: 0.45rem 1rem;
+  color: var(--site-nav-text);
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-border);
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: 160ms ease;
+}
+
+.category-chip:hover {
+  color: var(--site-accent-hover);
+  border-color: var(--site-accent);
+}
+
+.category-chip.active {
+  color: var(--site-accent);
+  background: var(--site-control-hover-bg);
+  border-color: var(--site-accent);
+}
+
+.category-scroller {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Product card — Flutter Card + skeleton equivalent */
+.product-card {
+  height: 100%;
+  overflow: hidden;
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 12px;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.product-card:hover {
+  box-shadow: 0 12px 28px var(--site-shadow);
+  transform: translateY(-2px);
+}
+
+.product-card-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+  opacity: 0.9;
+}
+
+.skeleton-line {
+  height: 12px;
+  background: var(--site-border);
+  border-radius: 4px;
+}
+
+.skeleton-line.accent {
+  width: 60%;
+  background: var(--site-accent);
+  opacity: 0.55;
+}
+
+/* Empty states — Flutter's centered icon + message */
+.empty-state {
+  padding: 3rem 1rem;
+  color: var(--site-muted-text);
+  text-align: center;
+}
+
+.empty-state svg {
+  color: var(--site-border);
+}
+
+/* Profile — avatar and menu rows */
+.profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+  border-radius: 50%;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.profile-menu .list-group-item {
+  color: var(--site-nav-text);
+  background: var(--site-navbar-bg);
+  border-color: var(--site-navbar-border);
+  padding-block: 0.9rem;
+}
+
+.profile-menu a.list-group-item:hover {
+  color: var(--site-accent-hover);
+  background: var(--site-control-hover-bg);
+}
+
+.profile-card {
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px var(--site-shadow);
+}
+
+.profile-form .form-control {
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border-color: var(--site-border);
+}
+
+.profile-form .form-control:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}

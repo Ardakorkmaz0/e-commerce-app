@@ -37,7 +37,7 @@ async function requestCurrentUser(accessToken: string): Promise<AuthenticatedUse
   }
 }
 
-async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+export async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
     const response = await fetch(`${getApiBaseUrl()}/auth/token/refresh/`, {
       method: "POST",
