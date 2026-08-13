@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { redirect } from "next/navigation";
+
+import { getCurrentUser } from "@/lib/auth";
 
 import { SignUpForm } from "./signup-form";
 
@@ -7,7 +10,12 @@ export const metadata: Metadata = {
   title: "Sign Up",
 };
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  const user = await getCurrentUser();
+  if (user) {
+    redirect("/");
+  }
+
   return (
     <main className="signin-page d-flex align-items-center min-vh-100">
       <div className="form-signin signup-form w-100 m-auto">

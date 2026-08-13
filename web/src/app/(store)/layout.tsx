@@ -1,13 +1,21 @@
+import { redirect } from "next/navigation";
+
 import { SiteNavbar } from "@/components/site-navbar";
+import { getCurrentUser } from "@/lib/auth";
 
 type StoreLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-export default function StoreLayout({ children }: StoreLayoutProps) {
+export default async function StoreLayout({ children }: StoreLayoutProps) {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/signin");
+  }
+
   return (
     <>
-      <SiteNavbar />
+      <SiteNavbar user={user} />
       {children}
     </>
   );

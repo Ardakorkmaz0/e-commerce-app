@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 User = get_user_model()
@@ -87,3 +88,56 @@ class RegisterApiTests(APITestCase):
         user = User.objects.get(username="newcustomer")
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
+
+
+class AuthenticationApiTests(APITestCase):
+    def setUp(self):
+        self.password = "StrongPass!2026"
+        self.user = User.objects.create_user(
+            username="customer",
+            email="customer@example.com",
+            password=self.password,
+        )
+
+    def test_returns_tokens_for_valid_credentials(self):
+        response = self.client.post(
+            reverse("accounts_api:token"),
+            {"username": self.user.username, "password": self.password},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
+    def test_returns_current_user_for_access_token(self):
+        access_token = str(RefreshToken.for_user(self.user).access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+
+        response = self.client.get(reverse("accounts_api:me"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], self.user.username)
+        self.assertEqual(response.data["email"], self.user.email)
+
+    def test_rejects_current_user_without_access_token(self):
+        response = self.client.get(reverse("accounts_api:me"))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_blacklists_refresh_token_on_logout(self):
+        refresh_token = RefreshToken.for_user(self.user)
+
+        response = self.client.post(
+            reverse("accounts_api:logout"),
+            {"refresh": str(refresh_token)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        refresh_response = self.client.post(
+            reverse("accounts_api:token_refresh"),
+            {"refresh": str(refresh_token)},
+            format="json",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -131,7 +131,8 @@ flutter test
 - Run `python manage.py makemigrations` only after changing Django models.
 - Run `flutter pub get` after cloning or changing `pubspec.yaml`.
 - Run `npm install` after cloning or changing `web/package.json`.
-- Redis and JWT login are not configured yet.
+- Redis is not configured yet.
+- Web authentication uses Django JWT endpoints through HttpOnly Next.js cookies.
 - Never commit `.env` or real database passwords.
 
 ## Author

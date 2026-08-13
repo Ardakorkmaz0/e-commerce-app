@@ -84,3 +84,17 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "A user with this username or email already exists."
             ) from error
+
+
+class CurrentUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_staff",
+        )
+        read_only_fields = fields

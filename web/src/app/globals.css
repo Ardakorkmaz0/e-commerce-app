@@ -176,6 +176,18 @@ body {
   border-color: var(--site-accent-hover) !important;
 }
 
+.theme-icon-moon {
+  display: none;
+}
+
+[data-bs-theme="dark"] .theme-icon-sun {
+  display: none;
+}
+
+[data-bs-theme="dark"] .theme-icon-moon {
+  display: block;
+}
+
 .site-cart-button:focus-visible,
 .site-account-button:focus-visible,
 .site-theme-button:focus-visible {
