@@ -1,5 +1,7 @@
+import 'package:ecommerce_mobile/features/auth/presentation/edit_profile_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_in_screen.dart';
-import 'package:ecommerce_mobile/features/products/presentation/product_list_screen.dart';
+import 'package:ecommerce_mobile/features/auth/presentation/sign_up_screen.dart';
+import 'package:ecommerce_mobile/features/main/presentation/main_screen.dart';
 import 'package:go_router/go_router.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -11,9 +13,19 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const SignInScreen(),
     ),
     GoRoute(
-      path: '/products',
-      name: 'products',
-      builder: (context, state) => const ProductListScreen(),
+      path: '/sign-up',
+      name: 'signUp',
+      builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
+      path: '/main',
+      name: 'main',
+      builder: (context, state) => const MainScreen(),
+    ),
+    GoRoute(
+      path: '/profile/edit',
+      name: 'editProfile',
+      builder: (context, state) => const EditProfileScreen(),
     ),
   ],
 );

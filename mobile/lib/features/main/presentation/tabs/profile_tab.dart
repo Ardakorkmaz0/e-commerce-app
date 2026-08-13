@@ -1,0 +1,111 @@
+import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/features/auth/data/models/user_model.dart';
+import 'package:ecommerce_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+// Web equivalent: navbar account dropdown (Profile, My Orders, Sign out)
+// Now uses ConsumerWidget to read real user data from authProvider
+class ProfileTab extends ConsumerWidget {
+  const ProfileTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch authProvider — rebuilds automatically when user data changes
+    final authState = ref.watch(authProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: authState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, _) => const Center(child: Text('Could not load profile.')),
+        data: (UserModel? user) {
+          if (user == null) return const Center(child: Text('Not signed in.'));
+          return ListView(
+            children: [
+              _ProfileHeader(user: user),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: const Text('My Orders'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {}, // TODO: navigate to orders page
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Edit Profile'),
+                trailing: const Icon(Icons.chevron_right),
+                // push (not go) so the screen stacks and can be popped back
+                onTap: () => context.pushNamed('editProfile'),
+              ),
+              if (user.isStaff)
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Admin Panel'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {}, // TODO: open Django admin in browser
+                ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Sign out', style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  await ref.read(authProvider.notifier).signOut();
+                  if (context.mounted) context.goNamed('signIn');
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 36,
+            backgroundColor: AppColors.primary.withAlpha(30),
+            // Show the first letter of the username as the avatar
+            child: Text(
+              user.username.substring(0, 1).toUpperCase(),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.displayName, // "First Last" or username if no name set
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                user.email,
+                style: const TextStyle(color: AppColors.mutedText),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
