@@ -1,39 +1,70 @@
-# E-Commerce & Inventory Platform
+# 🛒 VADER - E-Commerce & Inventory Platform
 
-A small-scale e-commerce and inventory platform with a Django REST backend, Next.js web application, Flutter Android application, and PostgreSQL database.
+A small e-commerce project with a Django REST backend, Next.js web application, Flutter mobile application, and PostgreSQL database.
 
-![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
-![Django](https://img.shields.io/badge/Django-5.2.17-0C4B33?logo=django&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Flutter](https://img.shields.io/badge/Flutter-3.44.9-02569B?logo=flutter&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-blue)
+![Django](https://img.shields.io/badge/Django-5.2.17-green)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
+![Flutter](https://img.shields.io/badge/Flutter-3.44.9-lightblue)
 
-## Current Stack
+## 🛠 Tech Stack
 
 - **Backend:** Django REST Framework
 - **Web:** Next.js, React, and TypeScript
 - **Mobile:** Flutter for Android
-- **Database:** PostgreSQL with Docker Compose
+- **Database:** PostgreSQL
+- **Authentication:** JWT
 - **Admin:** Django Admin
+- **Tools:** Docker and Docker Compose
 
-## First-Time Setup
+## 📁 Project Parts
+
+- `accounts/` - User model and authentication API
+- `ecommerce/` - Backend models for store features
+- `config/` - Django settings and main URLs
+- `web/` - Next.js web application
+- `mobile/` - Flutter Android application
+- `compose.yaml` - PostgreSQL Docker configuration
+
+More information:
+
+- [Web README](web/README.md)
+- [Mobile README](mobile/README.md)
+
+## ✅ Requirements
+
+Install these programs first:
+
+- Python 3.14
+- Docker Desktop
+- Node.js 20.9 or newer
+- Flutter and Android Studio for the mobile application
+
+## 🚀 Installation & Setup
 
 ### Windows (PowerShell)
 
 ```powershell
 # 1. Clone the repository
 git clone https://github.com/Ardakorkmaz0/e-commerce-app.git
+
+# 2. Open the project directory
 cd e-commerce-app
 
-# 2. Create and activate the Python environment
+# 3. Create a Python virtual environment
 python -m venv venv
+
+# 4. Allow script execution for this terminal
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+
+# 5. Activate the virtual environment
 .\venv\Scripts\Activate.ps1
 
-# 3. Install backend dependencies
+# 6. Install backend packages
 python -m pip install -r requirements.txt
 
-# 4. Create the local environment file
+# 7. Create the environment file
 notepad .env
 ```
 
@@ -50,92 +81,112 @@ DB_PORT=5433
 Continue in PowerShell:
 
 ```powershell
-# 5. Start PostgreSQL and apply migrations
+# 8. Start Docker Desktop
 docker desktop start
+
+# 9. Start PostgreSQL
 docker compose up -d --wait db
+
+# 10. Create the database tables
 python manage.py migrate
+
+# 11. Create an admin user
 python manage.py createsuperuser
 
-# 6. Install web dependencies
+# 12. Install web packages
 cd web
 npm install
+Copy-Item .env.example .env.local
 cd ..
 
-# 7. Install mobile dependencies
+# 13. Install mobile packages
 cd mobile
 flutter pub get
 flutter doctor -v
 cd ..
 ```
 
-## Start the Project
-
-Run one of these files from the project root:
+If `flutter` is not found:
 
 ```powershell
-# PostgreSQL + Django API + Next.js
+$env:Path = "$env:USERPROFILE\develop\flutter\bin;$env:Path"
+```
+
+## ▶️ Start the Project
+
+Run one of these files from the main project directory.
+
+### Start Web
+
+```powershell
 .\startweb.bat
+```
 
-# PostgreSQL + Django API + Android emulator + Flutter
+Starts PostgreSQL, Django API, and Next.js.
+
+### Start Mobile
+
+```powershell
 .\startmobile.bat
+```
 
-# PostgreSQL + Django API + Next.js + Android emulator + Flutter
+Starts PostgreSQL, Django API, Android emulator, and Flutter.
+
+### Start Web and Mobile
+
+```powershell
 .\startwebamobile.bat
 ```
 
-The scripts start Docker Desktop automatically when necessary. `startmobile.bat` and `startwebamobile.bat` use the `Pixel_8` emulator when no Android device is already connected.
+Starts the complete project.
 
-## Stop the Project
-
-The same stop file works for every start mode:
+## ⏹ Stop the Project
 
 ```powershell
 .\stop.bat
 ```
 
-It stops Django, Next.js, Flutter, the emulator started by the project, and Docker Compose services. The PostgreSQL volume and database data are preserved.
+This stops the project services. PostgreSQL data is not deleted.
 
-## Local Addresses
+## 🌐 Local Addresses
 
 | Service | Address |
 | --- | --- |
-| Next.js web application | `http://localhost:3000/` |
+| Web application | `http://localhost:3000/` |
 | Django REST API | `http://127.0.0.1:8000/api/v1/` |
 | Django Admin | `http://127.0.0.1:8000/admin/` |
-| PostgreSQL from Windows | `127.0.0.1:5433` |
-| Django API from Android through the start scripts | `http://127.0.0.1:8000/api/v1/` |
+| PostgreSQL | `127.0.0.1:5433` |
 
-Django on port `8000` is backend-only. The customer-facing web interface runs on port `3000`.
-The mobile start scripts configure ADB port forwarding automatically.
+The customer website runs on port `3000`. Port `8000` is used for the Django API and admin panel.
 
-## Checks and Tests
+## 🧪 Checks
 
 ```powershell
-# Backend
+# Backend checks
 .\venv\Scripts\python.exe manage.py check
 .\venv\Scripts\python.exe manage.py test
 
-# Web
+# Web checks
 cd web
 npm run lint
 npm run build
 
-# Mobile
+# Mobile checks
 cd ..\mobile
 flutter analyze
 flutter test
 ```
 
-## Useful Notes
+## 📝 Notes
 
-- Run `python manage.py makemigrations` only after changing Django models.
-- Run `flutter pub get` after cloning or changing `pubspec.yaml`.
-- Run `npm install` after cloning or changing `web/package.json`.
-- Redis is not configured yet.
-- Web authentication uses Django JWT endpoints through HttpOnly Next.js cookies.
-- Never commit `.env` or real database passwords.
+- Run `python manage.py makemigrations` only after changing a Django model.
+- Run `python manage.py migrate` after adding a new migration.
+- Run `npm install` after changing `web/package.json`.
+- Run `flutter pub get` after changing `mobile/pubspec.yaml`.
+- Never upload `.env` or real passwords to GitHub.
+- Redis is planned but is not configured yet.
 
-## Author
+## 👨‍💻 Author
 
 **Arda Korkmaz**
 
