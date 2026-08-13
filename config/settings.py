@@ -25,12 +25,21 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-a$70arb5eis%*a2r@dhyz4for*bs04s7oec7#3%!ilwkcyq0ci'
+# Read from .env — os.environ raises on a missing key so the app fails loudly
+# instead of silently running with an insecure fallback.
+SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Defaults to False so an unset value can never expose a production server.
+DEBUG = os.getenv("DEBUG", "False").strip().lower() in {"1", "true", "yes", "on"}
 
-ALLOWED_HOSTS = []
+# 10.0.2.2 is the host machine's loopback as seen from the Android emulator.
+# Without it Django raises DisallowedHost and returns an HTML error page.
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,10.0.2.2").split(",")
+    if host.strip()
+]
 
 
 # Application definition
