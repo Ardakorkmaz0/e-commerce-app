@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import CurrentUserSerializer, RegisterSerializer
+from .serializers import CurrentUserSerializer, RegisterSerializer, UpdateCurrentUserSerializer
 
 
 class RegisterView(generics.CreateAPIView):
@@ -20,6 +20,16 @@ class CurrentUserView(APIView):
     def get(self, request):
         serializer = CurrentUserSerializer(request.user)
         return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UpdateCurrentUserSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(CurrentUserSerializer(request.user).data)
 
 
 class LogoutView(APIView):
