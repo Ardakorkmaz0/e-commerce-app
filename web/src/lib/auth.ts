@@ -12,6 +12,7 @@ export type AuthenticatedUser = {
   first_name: string;
   last_name: string;
   is_staff: boolean;
+  is_seller: boolean;
 };
 
 export function getApiBaseUrl(): string {
@@ -57,6 +58,52 @@ export async function refreshAccessToken(refreshToken: string): Promise<string |
   } catch {
     return null;
   }
+}
+
+/**
+ * Calls the API with the signed-in user's access token, refreshing it once
+ * if it has expired. Returns null when there is no usable session.
+ */
+export async function authorizedFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response | null> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+  const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+
+  const send = (token: string) =>
+    fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers: { ...init.headers, Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+  let response: Response | null = null;
+  if (accessToken) {
+    response = await send(accessToken);
+  }
+
+  // Access tokens live 15 minutes, so an expired one is routine.
+  if ((!response || response.status === 401) && refreshToken) {
+    const renewed = await refreshAccessToken(refreshToken);
+    if (renewed) {
+      try {
+        cookieStore.set(ACCESS_TOKEN_COOKIE, renewed, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+        });
+      } catch {
+        // Cookies are read-only while rendering a page; the refreshed token
+        // still serves this request, it just is not persisted here.
+      }
+      response = await send(renewed);
+    }
+  }
+
+  return response;
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {

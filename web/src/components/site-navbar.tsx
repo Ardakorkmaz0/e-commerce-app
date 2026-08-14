@@ -3,14 +3,20 @@ import Link from "next/link";
 
 import { signOut } from "@/app/auth-actions";
 import type { AuthenticatedUser } from "@/lib/auth";
+import { fetchCategories } from "@/lib/products";
 
+import { CategorySelect } from "./category-select";
 import { ThemeToggle } from "./theme-toggle";
 
 type SiteNavbarProps = {
   user: AuthenticatedUser;
 };
 
-export function SiteNavbar({ user }: SiteNavbarProps) {
+export async function SiteNavbar({ user }: SiteNavbarProps) {
+  // Categories come from the database so the dropdown always matches
+  // whatever exists in the admin panel.
+  const categories = await fetchCategories();
+
   return (
     <>
       <nav className="navbar navbar-expand-lg site-navbar sticky-top">
@@ -43,30 +49,26 @@ export function SiteNavbar({ user }: SiteNavbarProps) {
           </button>
 
           <div className="collapse navbar-collapse" id="mainNavbar">
-            <ul className="navbar-nav ms-lg-4 me-auto mb-3 mb-lg-0">
-              <li className="nav-item">
-                <Link className="nav-link site-nav-link" href="/">
-                  Home
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className="nav-link site-nav-link" href="/categories">
-                  Categories
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link className="nav-link site-nav-link" href="/products">
-                  Products
-                </Link>
-              </li>
-            </ul>
+            {/* No nav links: the brand goes home, and the search form with its
+                department picker covers browsing. */}
+            <form
+              className="site-search d-flex ms-lg-4 me-lg-3 mb-3 mb-lg-0"
+              method="get"
+              action="/products"
+              role="search"
+            >
+              {/* Department picker, Amazon style. A native select keeps this
+                  working without JavaScript and submits with the GET form. */}
+              <label className="visually-hidden" htmlFor="searchCategory">
+                Category
+              </label>
+              <CategorySelect categories={categories} />
 
-            <form className="site-search d-flex me-lg-3 mb-3 mb-lg-0" method="get" action="/" role="search">
               <input
                 className="form-control"
                 type="search"
                 name="q"
-                placeholder="Search..."
+                placeholder="Search products..."
                 aria-label="Search"
               />
               <button className="btn btn-primary" type="submit">
@@ -123,6 +125,11 @@ export function SiteNavbar({ user }: SiteNavbarProps) {
                   <li>
                     <Link className="dropdown-item" href="/myorders">My Orders</Link>
                   </li>
+                  {user.is_seller ? (
+                    <li>
+                      <Link className="dropdown-item" href="/seller">My Products</Link>
+                    </li>
+                  ) : null}
                   {user.is_staff ? (
                     <li>
                       <a className="dropdown-item" href="http://127.0.0.1:8000/admin/">

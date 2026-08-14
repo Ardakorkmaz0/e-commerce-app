@@ -78,47 +78,36 @@ body {
   font-size: 0.7rem;
 }
 
-.site-nav-link {
-  position: relative;
-  color: var(--site-nav-text);
-  font-weight: 600;
-  transition: color 180ms ease;
-}
-
-.site-nav-link:hover,
-.site-nav-link.active {
-  color: var(--site-accent);
-}
-
-.site-nav-link::after {
-  position: absolute;
-  right: 0.5rem;
-  bottom: 0;
-  left: 0.5rem;
-  height: 3px;
-  content: "";
-  background: linear-gradient(90deg, var(--site-accent), var(--site-accent-secondary));
-  border-radius: 999px;
-  opacity: 0;
-  transform: scaleX(0);
-  transition: 180ms ease;
-}
-
-.site-nav-link:hover::after,
-.site-nav-link.active::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
 .site-search {
-  width: min(100%, 360px);
+  width: min(100%, 560px);
 }
 
+/* Department picker glued to the left of the input */
+.site-search .site-search-category {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 170px;
+  padding-inline-start: 1rem;
+  color: var(--site-control-text);
+  background-color: var(--site-control-bg);
+  border: 1px solid var(--site-border);
+  border-right: 0;
+  border-radius: 999px 0 0 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.site-search .site-search-category:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+/* The input now sits between the select and the button, so it has no rounding */
 .site-search .form-control {
   color: var(--site-text);
   border-right: 0;
   border-color: var(--site-border);
-  border-radius: 999px 0 0 999px;
+  border-radius: 0;
   background: var(--site-input-bg);
 }
 
@@ -330,10 +319,6 @@ body {
   .site-search {
     width: 100%;
   }
-
-  .site-nav-link::after {
-    display: none;
-  }
 }
 
 @media (max-width: 575.98px) {
@@ -426,22 +411,440 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--site-control-bg);
+  border-bottom: 1px solid var(--site-navbar-border);
+}
+
+/* contain (not cover) so product photos are never cropped */
+.product-card-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  object-fit: contain;
+}
+
+/* Fallback icon shown when a product has no picture */
+.product-card-media svg {
+  flex-shrink: 0;
+  color: var(--site-border);
+}
+
+.product-card-category {
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.product-card-name {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--site-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.product-card-price {
+  color: var(--site-accent);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.product-card-stock {
+  color: var(--site-muted-text);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.product-card-stock.out {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* ── Product detail page ────────────────────────────────────────────── */
+
+.product-breadcrumb {
+  color: var(--site-muted-text);
+  font-size: 0.85rem;
+}
+
+.product-breadcrumb a {
+  color: var(--site-muted-text);
+  text-decoration: none;
+}
+
+.product-breadcrumb a:hover {
+  color: var(--site-accent);
+  text-decoration: underline;
+}
+
+.product-detail-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 20px;
+}
+
+.product-detail-media svg {
+  color: var(--site-border);
+}
+
+.product-detail-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 32px;
+  object-fit: contain;
+}
+
+.product-detail-panel {
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px var(--site-shadow);
+}
+
+.product-detail-name {
+  margin: 0.35rem 0 1rem;
+  color: var(--site-text);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.product-detail-price {
+  color: var(--site-accent);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.stock-badge {
+  padding: 0.3rem 0.75rem;
+  color: #047857;
+  background: #d1fae5;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.stock-badge.out {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.product-detail-description {
+  color: var(--site-muted-text);
+  line-height: 1.65;
+}
+
+.product-detail-divider {
+  border-color: var(--site-navbar-border);
+  opacity: 1;
+}
+
+.product-detail-quantity {
+  width: 92px;
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border-color: var(--site-border);
+}
+
+.product-detail-quantity:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.product-detail-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--site-navbar-border);
+}
+
+.product-detail-meta dt {
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.product-detail-meta dd {
+  margin: 0.15rem 0 0;
+  color: var(--site-text);
+  font-weight: 600;
+}
+
+/* ── Filter panel ───────────────────────────────────────────────────── */
+
+.filter-panel {
+  position: sticky;
+  top: 96px;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 16px;
+}
+
+.filter-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.6rem;
+}
+
+/* Collapsible groups without JavaScript, via <details> */
+.filter-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.filter-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-group > summary::after {
+  content: "▾";
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  transition: transform 160ms ease;
+}
+
+.filter-group[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.filter-price-dash {
+  color: var(--site-muted-text);
+}
+
+.filter-price .form-control {
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border-color: var(--site-border);
+}
+
+.filter-price .form-control:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.filter-apply {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--site-action-start), var(--site-action-end));
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.filter-apply:hover {
+  color: #ffffff;
+  filter: brightness(1.08);
+}
+
+/* Removable chips above the results */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
   color: var(--site-accent);
   background: var(--site-control-bg);
-  opacity: 0.9;
+  border: 1px solid var(--site-accent);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.skeleton-line {
-  height: 12px;
-  background: var(--site-border);
-  border-radius: 4px;
-}
-
-.skeleton-line.accent {
-  width: 60%;
+.active-chip:hover {
+  color: #ffffff;
   background: var(--site-accent);
-  opacity: 0.55;
+}
+
+.active-chip-x {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sort-select {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sort-select-label {
+  color: var(--site-muted-text);
+  font-size: 0.78rem;
+}
+
+.sort-select .form-select {
+  width: auto;
+  color: var(--site-text);
+  background-color: var(--site-input-bg);
+  border-color: var(--site-border);
+  font-size: 0.82rem;
+}
+
+/* Seller form: filter tag checkboxes */
+.attribute-box {
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-border);
+  border-radius: 8px;
+}
+
+.attribute-legend {
+  color: var(--site-muted-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.filter-panel-title {
+  color: var(--site-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.filter-clear {
+  color: var(--site-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.filter-clear:hover {
+  text-decoration: underline;
+}
+
+.filter-group + .filter-group {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--site-navbar-border);
+}
+
+.filter-group-title {
+  margin-bottom: 0.4rem;
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.35rem;
+  color: var(--site-nav-text);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.filter-option:hover {
+  background: var(--site-control-hover-bg);
+  color: var(--site-accent-hover);
+}
+
+.filter-option.selected {
+  color: var(--site-accent);
+  font-weight: 600;
+}
+
+/* Links styled as checkboxes: the whole filter works without JavaScript */
+.filter-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  color: #ffffff;
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-border);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.filter-option.selected .filter-box {
+  background: var(--site-accent);
+  border-color: var(--site-accent);
+}
+
+.filter-label {
+  flex-grow: 1;
+}
+
+.filter-count {
+  color: var(--site-muted-text);
+  font-size: 0.75rem;
+}
+
+/* ── Seller panel ───────────────────────────────────────────────────── */
+
+.seller-table {
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 16px;
+}
+
+.seller-table .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--site-text);
+  margin-bottom: 0;
+}
+
+.seller-table thead th {
+  color: var(--site-muted-text);
+  border-bottom-color: var(--site-navbar-border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.seller-table tbody td {
+  border-top-color: var(--site-navbar-border);
+  vertical-align: middle;
+}
+
+.seller-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 8px;
+}
+
+.seller-thumb-empty {
+  display: inline-block;
 }
 
 /* Empty states — Flutter's centered icon + message */
@@ -497,4 +900,10 @@ body {
 .profile-form .form-control:focus {
   border-color: var(--site-focus);
   box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+.product-card-link {
+  display: block;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
 }
