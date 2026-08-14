@@ -87,6 +87,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
+    # Lets the storefront decide whether to show the seller panel link.
+    is_seller = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = (
@@ -96,8 +99,12 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_staff",
+            "is_seller",
         )
         read_only_fields = fields
+
+    def get_is_seller(self, obj):
+        return obj.groups.filter(name="Sellers").exists()
 
 
 class UpdateCurrentUserSerializer(serializers.ModelSerializer):

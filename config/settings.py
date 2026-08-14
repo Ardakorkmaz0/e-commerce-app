@@ -157,6 +157,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+# Uploaded files (product images). In production these are served by the
+# web server, not Django — see the media route in config/urls.py.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
