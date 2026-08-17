@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -141,3 +142,33 @@ class AuthenticationApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_seller_can_update_store_name_but_not_verification(self):
+        self.user.groups.add(Group.objects.create(name="Sellers"))
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.patch(
+            reverse("accounts_api:me"),
+            {
+                "store_name": "North Star Store",
+                "is_verified_seller": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.store_name, "North Star Store")
+        self.assertFalse(self.user.is_verified_seller)
+
+    def test_customer_cannot_set_a_store_name(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.patch(
+            reverse("accounts_api:me"),
+            {"store_name": "Not A Seller"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("store_name", response.data)

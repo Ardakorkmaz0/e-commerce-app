@@ -1,33 +1,73 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Count, Max, Min, Q
-from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from django.contrib.auth import get_user_model
+from django.db.models import Avg, Count, Max, Min, Q
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Attribute, Category, Product
-from .permissions import IsSeller
+from ..models import Attribute, Category, Product, SellerRating
+from .pagination import ProductPagination
+from .permissions import SELLER_GROUP, IsSeller
 from .serializers import (
     AttributeSerializer,
     CategorySerializer,
     ProductSerializer,
+    SellerRatingInputSerializer,
     SellerProductSerializer,
 )
+
+
+User = get_user_model()
 
 
 # Whitelist: the query string may only pick from these, never pass a raw
 # column name through to order_by().
 SORT_OPTIONS = {
-    "newest": "-created_at",
-    "price_asc": "price",
-    "price_desc": "-price",
-    "name": "name",
+    "newest": ("-created_at", "-id"),
+    "oldest": ("created_at", "id"),
+    "price_asc": ("price", "id"),
+    "price_desc": ("-price", "-id"),
+    "name": ("name", "id"),
+    "stock_desc": ("-stock", "id"),
+}
+
+PRICE_RANGES = {
+    "under-50": {"label": "Under $50", "min": None, "max": Decimal("50")},
+    "50-100": {
+        "label": "$50 to $100",
+        "min": Decimal("50"),
+        "max": Decimal("100"),
+    },
+    "100-250": {
+        "label": "$100 to $250",
+        "min": Decimal("100"),
+        "max": Decimal("250"),
+    },
+    "250-500": {
+        "label": "$250 to $500",
+        "min": Decimal("250"),
+        "max": Decimal("500"),
+    },
+    "over-500": {
+        "label": "$500 and over",
+        "min": Decimal("500"),
+        "max": None,
+    },
 }
 
 
 def apply_common_filters(queryset, query_params):
     """Price range, stock and sorting — the controls every store has."""
+    selected_range = PRICE_RANGES.get(query_params.get("price_range", ""))
+    if selected_range:
+        if selected_range["min"] is not None:
+            queryset = queryset.filter(price__gte=selected_range["min"])
+        if selected_range["max"] is not None:
+            queryset = queryset.filter(price__lt=selected_range["max"])
+
     min_price = query_params.get("min_price", "").strip()
     if min_price:
         try:
@@ -45,9 +85,16 @@ def apply_common_filters(queryset, query_params):
     if query_params.get("in_stock") == "1":
         queryset = queryset.filter(stock__gt=0)
 
-    ordering = SORT_OPTIONS.get(query_params.get("sort", ""), None)
-    if ordering:
-        queryset = queryset.order_by(ordering)
+    availability = query_params.get("availability", "")
+    if availability == "in_stock":
+        queryset = queryset.filter(stock__gt=0)
+    elif availability == "low_stock":
+        queryset = queryset.filter(stock__range=(1, 10))
+    elif availability == "out_of_stock":
+        queryset = queryset.filter(stock=0)
+
+    ordering = SORT_OPTIONS.get(query_params.get("sort", ""), SORT_OPTIONS["newest"])
+    queryset = queryset.order_by(*ordering)
 
     return queryset
 
@@ -102,10 +149,15 @@ class ProductListView(generics.ListAPIView):
 
     permission_classes = [AllowAny]
     serializer_class = ProductSerializer
+    pagination_class = ProductPagination
 
     def get_queryset(self):
         # select_related avoids one extra query per product for the category.
-        queryset = Product.objects.filter(is_active=True).select_related("category")
+        queryset = (
+            Product.objects.filter(is_active=True)
+            .select_related("category", "seller")
+            .prefetch_related("seller__seller_ratings_received")
+        )
 
         category = self.request.query_params.get("category", "").strip()
         if category:
@@ -136,7 +188,80 @@ class ProductDetailView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
     serializer_class = ProductSerializer
     lookup_field = "slug"
-    queryset = Product.objects.filter(is_active=True).select_related("category")
+    queryset = (
+        Product.objects.filter(is_active=True)
+        .select_related("category", "seller")
+        .prefetch_related("seller__seller_ratings_received")
+    )
+
+
+def seller_rating_payload(seller, customer):
+    """Return the current customer's score together with public statistics."""
+    current_score = SellerRating.objects.filter(
+        seller=seller,
+        customer=customer,
+    ).values_list("score", flat=True).first()
+    statistics = SellerRating.objects.filter(seller=seller).aggregate(
+        average=Avg("score"),
+        count=Count("id"),
+    )
+    average = statistics["average"]
+
+    return {
+        "seller_id": seller.pk,
+        "score": current_score,
+        "rating": round(float(average), 1) if average is not None else None,
+        "rating_count": statistics["count"],
+    }
+
+
+class SellerRatingView(APIView):
+    """
+    GET / PUT / DELETE /api/v1/sellers/<id>/rating/
+
+    The URL represents the authenticated customer's single rating for one
+    seller. PUT is an idempotent upsert and DELETE is idempotent as well.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_seller(self, seller_id):
+        return get_object_or_404(
+            User.objects.filter(
+                is_active=True,
+                groups__name=SELLER_GROUP,
+            ).distinct(),
+            pk=seller_id,
+        )
+
+    def get(self, request, seller_id):
+        seller = self.get_seller(seller_id)
+        return Response(seller_rating_payload(seller, request.user))
+
+    def put(self, request, seller_id):
+        seller = self.get_seller(seller_id)
+        if seller.pk == request.user.pk:
+            return Response(
+                {"detail": "You cannot rate yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = SellerRatingInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        SellerRating.objects.update_or_create(
+            seller=seller,
+            customer=request.user,
+            defaults={"score": serializer.validated_data["score"]},
+        )
+        return Response(seller_rating_payload(seller, request.user))
+
+    def delete(self, request, seller_id):
+        seller = self.get_seller(seller_id)
+        SellerRating.objects.filter(
+            seller=seller,
+            customer=request.user,
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AttributeListView(generics.ListAPIView):
@@ -171,26 +296,67 @@ class FacetListView(APIView):
         category = request.query_params.get("category", "").strip()
         search = request.query_params.get("q", "").strip()
 
-        # Price bounds come from the products actually on offer, so the
-        # range inputs can show real numbers instead of guesses.
-        products = Product.objects.filter(is_active=True)
-        if category:
-            products = products.filter(category__slug=category)
+        base_products = Product.objects.filter(is_active=True)
         if search:
-            products = products.filter(
+            base_products = base_products.filter(
                 Q(name__icontains=search) | Q(description__icontains=search)
             )
+
+        category_rows = (
+            base_products.values("category__name", "category__slug")
+            .annotate(product_count=Count("id"))
+            .order_by("category__name")
+        )
+        categories = [
+            {
+                "name": row["category__name"],
+                "slug": row["category__slug"],
+                "count": row["product_count"],
+            }
+            for row in category_rows
+        ]
+
+        products = base_products
+        if category:
+            products = products.filter(category__slug=category)
+
         bounds = products.aggregate(low=Min("price"), high=Max("price"))
+
+        price_ranges = []
+        for slug, definition in PRICE_RANGES.items():
+            range_products = products
+            if definition["min"] is not None:
+                range_products = range_products.filter(price__gte=definition["min"])
+            if definition["max"] is not None:
+                range_products = range_products.filter(price__lt=definition["max"])
+            price_ranges.append(
+                {
+                    "slug": slug,
+                    "label": definition["label"],
+                    "count": range_products.count(),
+                }
+            )
 
         price = {
             "min": str(bounds["low"]) if bounds["low"] is not None else "",
             "max": str(bounds["high"]) if bounds["high"] is not None else "",
+            "ranges": price_ranges,
+        }
+
+        common_payload = {
+            "categories": categories,
+            "availability": {
+                "in_stock": products.filter(stock__gt=0).count(),
+                "low_stock": products.filter(stock__range=(1, 10)).count(),
+                "out_of_stock": products.filter(stock=0).count(),
+            },
+            "price": price,
         }
 
         # Attribute facets only make sense inside a category: "Series" has
         # no meaning across shoes and graphics cards at once.
         if not category:
-            return Response({"attributes": [], "price": price})
+            return Response({**common_payload, "attributes": []})
 
         attributes = Attribute.objects.prefetch_related("values").filter(
             categories__slug=category
@@ -232,7 +398,7 @@ class FacetListView(APIView):
                 }
             )
 
-        return Response({"attributes": payload, "price": price})
+        return Response({**common_payload, "attributes": payload})
 
 
 # ── Seller panel ─────────────────────────────────────────────────────

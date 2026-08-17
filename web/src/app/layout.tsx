@@ -19,6 +19,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html
       lang="en"
       data-bs-theme="light"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <head>

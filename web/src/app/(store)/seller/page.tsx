@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { VerifiedSellerBadge } from "@/components/verified-seller-badge";
 import { getCurrentUser } from "@/lib/auth";
 import { formatPrice } from "@/lib/products";
 import { fetchSellerProducts } from "@/lib/seller";
@@ -28,14 +29,25 @@ export default async function SellerPage() {
     <main className="container py-4">
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
         <div>
-          <h1 className="section-title mb-1">My Products</h1>
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <h1 className="section-title mb-0">
+              {user.store_name || user.username}
+            </h1>
+            {user.is_verified_seller ? <VerifiedSellerBadge /> : null}
+          </div>
           <p className="mb-0" style={{ color: "var(--site-muted-text)" }}>
-            {products.length} listing{products.length === 1 ? "" : "s"}
+            Seller dashboard &middot; {products.length} listing
+            {products.length === 1 ? "" : "s"}
           </p>
         </div>
-        <Link className="btn signin-submit-button" href="/seller/new">
-          Add product
-        </Link>
+        <div className="d-flex gap-2">
+          <Link className="btn btn-outline-secondary" href="/profile/edit">
+            Edit store profile
+          </Link>
+          <Link className="btn signin-submit-button" href="/seller/new">
+            Add product
+          </Link>
+        </div>
       </div>
 
       {products.length ? (

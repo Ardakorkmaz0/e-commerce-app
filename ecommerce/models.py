@@ -150,3 +150,41 @@ class Product(models.Model):
         if self.image:
             return self.image.url
         return self.image_url
+
+
+class SellerRating(models.Model):
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="seller_ratings_received",
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="seller_ratings_given",
+    )
+    score = models.PositiveSmallIntegerField(
+        choices=((1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5"))
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("seller", "customer"),
+                name="unique_customer_rating_per_seller",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(score__gte=1, score__lte=5),
+                name="seller_rating_score_between_1_and_5",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(seller=models.F("customer")),
+                name="seller_cannot_rate_self",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.customer} -> {self.seller}: {self.score}"

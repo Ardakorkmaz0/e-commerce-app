@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Attribute, AttributeValue, Category, Product
+from .models import Attribute, AttributeValue, Category, Product, SellerRating
 
 
 class AttributeValueInline(admin.TabularInline):
@@ -167,3 +167,15 @@ class ProductAdmin(admin.ModelAdmin):
             'object-fit:contain;border-radius:8px;" />',
             obj.display_image,
         )
+
+
+@admin.register(SellerRating)
+class SellerRatingAdmin(admin.ModelAdmin):
+    list_display = ("seller", "customer", "score", "updated_at")
+    list_filter = ("score", "updated_at")
+    search_fields = (
+        "seller__username",
+        "seller__store_name",
+        "customer__username",
+    )
+    readonly_fields = ("created_at", "updated_at")

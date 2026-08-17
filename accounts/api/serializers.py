@@ -98,6 +98,8 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "store_name",
+            "is_verified_seller",
             "is_staff",
             "is_seller",
         )
@@ -110,10 +112,18 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 class UpdateCurrentUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name")
+        fields = ("email", "first_name", "last_name", "store_name")
 
     def validate_email(self, value):
         email = value.strip().lower()
         if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return email
+
+    def validate_store_name(self, value):
+        name = value.strip()
+        if name and not self.instance.groups.filter(name="Sellers").exists():
+            raise serializers.ValidationError(
+                "Only seller accounts can set a store name."
+            )
+        return name

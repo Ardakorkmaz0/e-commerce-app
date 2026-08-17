@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProductCard } from "@/components/product-card";
+import { SellerRatingForm } from "@/components/seller-rating-form";
+import { VerifiedSellerBadge } from "@/components/verified-seller-badge";
+import { getCurrentUser } from "@/lib/auth";
 import { fetchProduct, fetchProducts, formatPrice } from "@/lib/products";
+import { fetchSellerRating } from "@/lib/seller-ratings";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -24,10 +28,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  const [categoryProducts, user, ownSellerRating] = await Promise.all([
+    fetchProducts({ category: product.category_slug }),
+    getCurrentUser(),
+    product.seller
+      ? fetchSellerRating(product.seller.id)
+      : Promise.resolve(null),
+  ]);
+
   // Other products from the same category, current one removed.
-  const related = (await fetchProducts({ category: product.category_slug }))
+  const related = categoryProducts
     .filter((item) => item.id !== product.id)
     .slice(0, 4);
+
+  const sellerRating = product.seller
+    ? (ownSellerRating?.rating ?? product.seller.rating)
+    : null;
+  const sellerRatingCount = product.seller
+    ? (ownSellerRating?.rating_count ?? product.seller.rating_count)
+    : 0;
 
   return (
     <main className="container py-4">
@@ -91,6 +110,61 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 No description yet.
               </p>
             )}
+
+            {product.seller ? (
+              <section
+                className="product-seller-panel"
+                aria-label="Seller information"
+              >
+                <div className="product-seller-heading">
+                  <div>
+                    <span className="product-seller-label">Sold by</span>
+                    <div className="product-seller-name">
+                      <strong>{product.seller.name}</strong>
+                      {product.seller.is_verified ? (
+                        <VerifiedSellerBadge />
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div
+                    className="product-seller-score"
+                    aria-label={
+                      sellerRating === null
+                        ? "Seller has no ratings yet"
+                        : `Seller rating ${sellerRating.toFixed(1)} out of 5 from ${sellerRatingCount} ratings`
+                    }
+                  >
+                    {sellerRating === null ? (
+                      <span>New seller</span>
+                    ) : (
+                      <>
+                        <span className="seller-rating-star-icon" aria-hidden="true">
+                          &#9733;
+                        </span>
+                        <strong>{sellerRating.toFixed(1)}</strong>
+                        <span>
+                          {sellerRatingCount} rating
+                          {sellerRatingCount === 1 ? "" : "s"}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {user?.id === product.seller.id ? (
+                  <p className="seller-rating-owner-note mb-0">
+                    This is your store. Sellers cannot rate their own store.
+                  </p>
+                ) : user ? (
+                  <SellerRatingForm
+                    productSlug={product.slug}
+                    sellerId={product.seller.id}
+                    initialScore={ownSellerRating?.score ?? null}
+                  />
+                ) : null}
+              </section>
+            ) : null}
 
             <hr className="product-detail-divider" />
 

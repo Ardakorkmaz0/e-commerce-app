@@ -4,9 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const OPTIONS = [
   { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
   { value: "price_asc", label: "Price: low to high" },
   { value: "price_desc", label: "Price: high to low" },
   { value: "name", label: "Name: A to Z" },
+  { value: "stock_desc", label: "Most in stock" },
 ];
 
 export function SortSelect() {

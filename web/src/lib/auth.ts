@@ -11,6 +11,8 @@ export type AuthenticatedUser = {
   email: string;
   first_name: string;
   last_name: string;
+  store_name: string;
+  is_verified_seller: boolean;
   is_staff: boolean;
   is_seller: boolean;
 };

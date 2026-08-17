@@ -46,6 +46,7 @@ export async function updateProfile(
     email: getText(formData, "email").trim(),
     first_name: getText(formData, "first_name").trim(),
     last_name: getText(formData, "last_name").trim(),
+    store_name: getText(formData, "store_name").trim(),
   };
 
   const cookieStore = await cookies();

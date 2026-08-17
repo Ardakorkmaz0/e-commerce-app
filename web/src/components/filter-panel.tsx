@@ -38,13 +38,30 @@ function withoutKey(current: URLSearchParams, key: string): string {
   return query ? `/products?${query}` : "/products";
 }
 
+function singleValueHref(
+  current: URLSearchParams,
+  key: string,
+  value: string,
+  remove: string[] = [],
+): string {
+  const next = new URLSearchParams(current);
+  if (next.get(key) === value) {
+    next.delete(key);
+  } else {
+    next.set(key, value);
+  }
+  for (const item of remove) next.delete(item);
+  const query = next.toString();
+  return query ? `/products?${query}` : "/products";
+}
+
 type FilterPanelProps = {
   facets: Facets;
   searchParams: URLSearchParams;
 };
 
 export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
-  const { attributes, price } = facets;
+  const { attributes, availability, categories, price } = facets;
 
   // Clearing keeps the category and the search text, drops everything else.
   const cleared = new URLSearchParams();
@@ -57,7 +74,9 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
     (key) => key !== "category" && key !== "q" && key !== "sort",
   );
 
-  const inStockOnly = searchParams.get("in_stock") === "1";
+  const selectedCategory = searchParams.get("category") ?? "";
+  const selectedAvailability = searchParams.get("availability") ?? "";
+  const selectedPriceRange = searchParams.get("price_range") ?? "";
   const minPrice = searchParams.get("min_price") ?? "";
   const maxPrice = searchParams.get("max_price") ?? "";
 
@@ -75,10 +94,62 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
       {/* Price range — a GET form, so the other filters travel as hidden
           inputs rather than being lost on submit. */}
       <details className="filter-group" open>
+        <summary className="filter-group-title">Department</summary>
+        <ul className="list-unstyled mb-0">
+          {categories.map((item) => {
+            const isSelected = selectedCategory === item.slug;
+            return (
+              <li key={item.slug}>
+                <Link
+                  className={`filter-option${isSelected ? " selected" : ""}`}
+                  href={singleValueHref(searchParams, "category", item.slug)}
+                >
+                  <span className="filter-radio" aria-hidden="true">
+                    {isSelected ? "\u2022" : ""}
+                  </span>
+                  <span className="filter-label">{item.name}</span>
+                  <span className="filter-count">{item.count}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+
+      <details className="filter-group" open>
         <summary className="filter-group-title">Price</summary>
+        <ul className="list-unstyled mb-2">
+          {price.ranges.map((item) => {
+            const isSelected = selectedPriceRange === item.slug;
+            return (
+              <li key={item.slug}>
+                <Link
+                  className={`filter-option${isSelected ? " selected" : ""}`}
+                  href={singleValueHref(
+                    searchParams,
+                    "price_range",
+                    item.slug,
+                    ["min_price", "max_price"],
+                  )}
+                >
+                  <span className="filter-radio" aria-hidden="true">
+                    {isSelected ? "\u2022" : ""}
+                  </span>
+                  <span className="filter-label">{item.label}</span>
+                  <span className="filter-count">{item.count}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
         <form className="filter-price" action="/products" method="get">
           {[...searchParams.entries()]
-            .filter(([key]) => key !== "min_price" && key !== "max_price")
+            .filter(
+              ([key]) =>
+                key !== "min_price" &&
+                key !== "max_price" &&
+                key !== "price_range",
+            )
             .map(([key, value]) => (
               <input type="hidden" name={key} value={value} key={key} />
             ))}
@@ -117,19 +188,35 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
       {/* Availability */}
       <details className="filter-group" open>
         <summary className="filter-group-title">Availability</summary>
-        <Link
-          className={`filter-option${inStockOnly ? " selected" : ""}`}
-          href={
-            inStockOnly
-              ? withoutKey(searchParams, "in_stock")
-              : toggleHref(searchParams, "in_stock", "1")
-          }
-        >
-          <span className="filter-box" aria-hidden="true">
-            {inStockOnly ? "✓" : ""}
-          </span>
-          <span className="filter-label">In stock only</span>
-        </Link>
+        {[
+          { value: "in_stock", label: "In stock", count: availability.in_stock },
+          { value: "low_stock", label: "Low stock", count: availability.low_stock },
+          {
+            value: "out_of_stock",
+            label: "Out of stock",
+            count: availability.out_of_stock,
+          },
+        ].map((item) => {
+          const isSelected = selectedAvailability === item.value;
+          return (
+            <Link
+              className={`filter-option${isSelected ? " selected" : ""}`}
+              href={singleValueHref(
+                searchParams,
+                "availability",
+                item.value,
+                ["in_stock"],
+              )}
+              key={item.value}
+            >
+              <span className="filter-radio" aria-hidden="true">
+                {isSelected ? "\u2022" : ""}
+              </span>
+              <span className="filter-label">{item.label}</span>
+              <span className="filter-count">{item.count}</span>
+            </Link>
+          );
+        })}
       </details>
 
       {attributes.map((facet) => {
@@ -176,6 +263,24 @@ export function ActiveFilters({
 }) {
   const chips: { label: string; href: string }[] = [];
 
+  const category = searchParams.get("category");
+  if (category) {
+    const value = facets.categories.find((item) => item.slug === category);
+    chips.push({
+      label: `Department: ${value?.name ?? category}`,
+      href: withoutKey(searchParams, "category"),
+    });
+  }
+
+  const priceRange = searchParams.get("price_range");
+  if (priceRange) {
+    const value = facets.price.ranges.find((item) => item.slug === priceRange);
+    chips.push({
+      label: value?.label ?? priceRange,
+      href: withoutKey(searchParams, "price_range"),
+    });
+  }
+
   const minPrice = searchParams.get("min_price");
   const maxPrice = searchParams.get("max_price");
   if (minPrice || maxPrice) {
@@ -192,6 +297,19 @@ export function ActiveFilters({
     chips.push({
       label: "In stock only",
       href: withoutKey(searchParams, "in_stock"),
+    });
+  }
+
+  const availability = searchParams.get("availability");
+  if (availability) {
+    const labels: Record<string, string> = {
+      in_stock: "In stock",
+      low_stock: "Low stock",
+      out_of_stock: "Out of stock",
+    };
+    chips.push({
+      label: labels[availability] ?? availability,
+      href: withoutKey(searchParams, "availability"),
     });
   }
 

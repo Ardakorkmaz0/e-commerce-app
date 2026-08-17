@@ -93,13 +93,16 @@ python manage.py migrate
 # 11. Create an admin user
 python manage.py createsuperuser
 
-# 12. Install web packages
+# 12. Add the demo product catalog
+python manage.py seed_catalog
+
+# 13. Install web packages
 cd web
 npm install
 Copy-Item .env.example .env.local
 cd ..
 
-# 13. Install mobile packages
+# 14. Install mobile packages
 cd mobile
 flutter pub get
 flutter doctor -v

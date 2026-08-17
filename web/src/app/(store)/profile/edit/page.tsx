@@ -26,13 +26,15 @@ export default async function EditProfilePage() {
           <span style={{ color: "var(--site-muted-text)" }}>@{user.username}</span>
         </div>
 
-        {/* The username is not editable — the backend only accepts
-            email, first_name and last_name on PATCH /auth/me/. */}
+        {/* The username and seller verification status are not editable. */}
         <EditProfileForm
           defaultValues={{
             email: user.email,
             firstName: user.first_name,
             lastName: user.last_name,
+            storeName: user.store_name,
+            isSeller: user.is_seller,
+            isVerifiedSeller: user.is_verified_seller,
           }}
         />
       </div>

@@ -1,26 +1,18 @@
 import "server-only";
 
 import { getApiBaseUrl } from "./auth";
+import {
+  PRODUCT_PAGE_SIZE,
+  type PaginatedProducts,
+  type Product,
+} from "./catalog";
+
+export { formatPrice, type PaginatedProducts, type Product } from "./catalog";
 
 export type Category = {
   id: number;
   name: string;
   slug: string;
-};
-
-export type Product = {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  // DRF serializes DecimalField as a string so the value keeps its exact
-  // precision. Parse it only for formatting, never for money arithmetic.
-  price: string;
-  stock: number;
-  in_stock: boolean;
-  category: string;
-  category_slug: string;
-  image_url: string;
 };
 
 // The catalog endpoints are public, so no Authorization header is needed.
@@ -52,6 +44,12 @@ export type Facet = {
   values: FacetValue[];
 };
 
+export type CategoryFacet = {
+  name: string;
+  slug: string;
+  count: number;
+};
+
 export type AttributeOption = {
   id: number;
   name: string;
@@ -78,14 +76,30 @@ export async function fetchAttributes(): Promise<AttributeOption[]> {
 export type PriceBounds = {
   min: string;
   max: string;
+  ranges: {
+    slug: string;
+    label: string;
+    count: number;
+  }[];
 };
 
 export type Facets = {
+  categories: CategoryFacet[];
+  availability: {
+    in_stock: number;
+    low_stock: number;
+    out_of_stock: number;
+  };
   attributes: Facet[];
   price: PriceBounds;
 };
 
-const EMPTY_FACETS: Facets = { attributes: [], price: { min: "", max: "" } };
+const EMPTY_FACETS: Facets = {
+  categories: [],
+  availability: { in_stock: 0, low_stock: 0, out_of_stock: 0 },
+  attributes: [],
+  price: { min: "", max: "", ranges: [] },
+};
 
 /** Describes the filter panel: attributes, their values, and price bounds. */
 export async function fetchFacets(
@@ -112,14 +126,25 @@ export async function fetchFacets(
   }
 }
 
-export async function fetchProducts(
-  filters: {
-    category?: string;
-    q?: string;
-    /** Attribute filters, e.g. { brand: "rtx", series: "3060,4060" }. */
-    attributes?: Record<string, string>;
-  } = {},
-): Promise<Product[]> {
+export type ProductFilters = {
+  category?: string;
+  q?: string;
+  /** Attribute filters, e.g. { memory: "8-gb", series: "3060,4060" }. */
+  attributes?: Record<string, string>;
+  page?: number;
+  pageSize?: number;
+};
+
+const EMPTY_PRODUCT_PAGE: PaginatedProducts = {
+  count: 0,
+  next: null,
+  previous: null,
+  results: [],
+};
+
+export async function fetchProductPage(
+  filters: ProductFilters = {},
+): Promise<PaginatedProducts> {
   const params = new URLSearchParams();
   if (filters.category) {
     params.set("category", filters.category);
@@ -132,6 +157,12 @@ export async function fetchProducts(
       params.set(slug, value);
     }
   }
+  if (filters.page && filters.page > 1) {
+    params.set("page", String(filters.page));
+  }
+  if (filters.pageSize) {
+    params.set("page_size", String(filters.pageSize));
+  }
 
   const query = params.toString();
   const url = `${getApiBaseUrl()}/products/${query ? `?${query}` : ""}`;
@@ -139,18 +170,22 @@ export async function fetchProducts(
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
-      return [];
+      return EMPTY_PRODUCT_PAGE;
     }
-    return (await response.json()) as Product[];
+    return (await response.json()) as PaginatedProducts;
   } catch {
-    return [];
+    return EMPTY_PRODUCT_PAGE;
   }
 }
 
-// TODO: move the currency to configuration once orders are implemented.
-export function formatPrice(price: string): string {
-  const amount = Number(price);
-  return Number.isFinite(amount) ? `$${amount.toFixed(2)}` : price;
+export async function fetchProducts(
+  filters: ProductFilters = {},
+): Promise<Product[]> {
+  const page = await fetchProductPage({
+    ...filters,
+    pageSize: filters.pageSize ?? PRODUCT_PAGE_SIZE,
+  });
+  return page.results;
 }
 
 export async function fetchProduct(slug: string): Promise<Product | null> {

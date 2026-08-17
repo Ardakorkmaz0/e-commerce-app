@@ -6,6 +6,7 @@ from .views import (
     FacetListView,
     ProductDetailView,
     ProductListView,
+    SellerRatingView,
     SellerProductDetailView,
     SellerProductListCreateView,
 )
@@ -20,6 +21,11 @@ urlpatterns = [
     path("facets/", FacetListView.as_view(), name="facets"),
     path("products/", ProductListView.as_view(), name="products"),
     path("products/<slug:slug>/", ProductDetailView.as_view(), name="product_detail"),
+    path(
+        "sellers/<int:seller_id>/rating/",
+        SellerRatingView.as_view(),
+        name="seller_rating",
+    ),
     # Seller panel (JWT + Sellers group)
     path(
         "seller/products/",

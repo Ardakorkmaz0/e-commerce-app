@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/app/auth-actions";
+import { VerifiedSellerBadge } from "@/components/verified-seller-badge";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -33,6 +34,12 @@ export default async function ProfilePage() {
               {displayName}
             </div>
             <div style={{ color: "var(--site-muted-text)" }}>{user.email}</div>
+            {user.is_seller ? (
+              <div className="profile-store-name mt-2">
+                <span>{user.store_name || user.username}</span>
+                {user.is_verified_seller ? <VerifiedSellerBadge /> : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { VerifiedSellerBadge } from "@/components/verified-seller-badge";
+
 import { updateProfile, type EditProfileFormState } from "./actions";
 
 const initialState: EditProfileFormState = {
@@ -32,6 +34,9 @@ type EditProfileFormProps = {
     email: string;
     firstName: string;
     lastName: string;
+    storeName: string;
+    isSeller: boolean;
+    isVerifiedSeller: boolean;
   };
 };
 
@@ -102,6 +107,34 @@ export function EditProfileForm({ defaultValues }: EditProfileFormProps) {
         />
         <FieldError errors={state.errors.email} />
       </div>
+
+      {defaultValues.isSeller ? (
+        <div className="seller-profile-field mt-4">
+          <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <label className="form-label mb-0" htmlFor="storeName">
+              Store name
+            </label>
+            {defaultValues.isVerifiedSeller ? <VerifiedSellerBadge /> : null}
+          </div>
+          <input
+            type="text"
+            className="form-control"
+            id="storeName"
+            name="store_name"
+            autoComplete="organization"
+            maxLength={120}
+            defaultValue={defaultValues.storeName}
+            placeholder="Enter the name customers will see"
+          />
+          <div className="form-text">
+            This name appears beside every product you sell. Your username is
+            used when the store name is empty.
+          </div>
+          <FieldError errors={state.errors.store_name} />
+        </div>
+      ) : (
+        <input type="hidden" name="store_name" value="" />
+      )}
 
       <div className="d-flex gap-2 mt-4">
         <Link className="btn btn-outline-secondary" href="/profile">

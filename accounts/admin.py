@@ -11,8 +11,26 @@ SELLER_GROUP = "Sellers"
 class CustomUserAdmin(UserAdmin):
     # Django's default list does not show groups, which makes it impossible
     # to tell at a glance who is a seller. These two columns fix that.
-    list_display = (*UserAdmin.list_display, "is_seller", "group_names")
-    list_filter = (*UserAdmin.list_filter, "groups")
+    list_display = (
+        *UserAdmin.list_display,
+        "store_name",
+        "is_seller",
+        "is_verified_seller",
+        "group_names",
+    )
+    list_filter = (*UserAdmin.list_filter, "groups", "is_verified_seller")
+    fieldsets = UserAdmin.fieldsets + (
+        (
+            "Seller profile",
+            {"fields": ("store_name", "is_verified_seller")},
+        ),
+    )
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (
+            "Seller profile",
+            {"fields": ("store_name", "is_verified_seller")},
+        ),
+    )
 
     def get_queryset(self, request):
         # Without this the group columns would run one query per row.

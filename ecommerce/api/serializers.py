@@ -3,6 +3,10 @@ from rest_framework import serializers
 from ..models import Attribute, AttributeValue, Category, Product
 
 
+class SellerRatingInputSerializer(serializers.Serializer):
+    score = serializers.IntegerField(min_value=1, max_value=5)
+
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -110,6 +114,7 @@ class ProductSerializer(serializers.ModelSerializer):
     # Keeps a single image field in the API whether the picture was uploaded
     # or pasted as a link, so the frontend never has to choose between two.
     image_url = serializers.SerializerMethodField()
+    seller = serializers.SerializerMethodField()
 
     def get_image_url(self, obj):
         image = obj.display_image
@@ -122,6 +127,26 @@ class ProductSerializer(serializers.ModelSerializer):
         if request is not None and image.startswith("/"):
             return request.build_absolute_uri(image)
         return image
+
+    def get_seller(self, obj):
+        seller = obj.seller
+        if seller is None:
+            return None
+
+        ratings = list(seller.seller_ratings_received.all())
+        rating_count = len(ratings)
+        average = (
+            round(sum(rating.score for rating in ratings) / rating_count, 1)
+            if rating_count
+            else None
+        )
+        return {
+            "id": seller.id,
+            "name": seller.seller_display_name,
+            "is_verified": seller.is_verified_seller,
+            "rating": average,
+            "rating_count": rating_count,
+        }
 
     class Meta:
         model = Product
@@ -136,4 +161,5 @@ class ProductSerializer(serializers.ModelSerializer):
             "category",
             "category_slug",
             "image_url",
+            "seller",
         )
