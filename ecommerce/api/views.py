@@ -285,9 +285,10 @@ class FacetListView(APIView):
     Describes the filter panel: which attributes apply to the selected
     category, their values, and how many products each value would match.
 
-    Counts respect the category and the search text but ignore the active
-    attribute filters. That keeps the other options visible after a
-    selection instead of the panel collapsing to a single choice.
+    Attribute counts respect every active filter except the group's own
+    selection, so choosing a product type narrows the groups below it and
+    values that can no longer match disappear. See the loop below for why
+    a group is excluded from its own count.
     """
 
     permission_classes = [AllowAny]
@@ -362,20 +363,33 @@ class FacetListView(APIView):
             categories__slug=category
         ).distinct()
 
-        product_filter = Q(products__is_active=True)
-        if category:
-            product_filter &= Q(products__category__slug=category)
-        if search:
-            product_filter &= Q(products__name__icontains=search) | Q(
-                products__description__icontains=search
-            )
+        attributes = list(attributes)
 
         payload = []
         for attribute in attributes:
+            # Count against everything already chosen, except this
+            # attribute's own selection.
+            #
+            # Excluding self is what makes multi-select work: values inside
+            # one group are OR-ed, so if picking "Headphones" also narrowed
+            # the Product type group, its siblings would drop to zero and a
+            # second type could never be added. Every *other* group does
+            # narrow, which is the behaviour being asked for here — after
+            # choosing Headphones, Connectivity only lists what headphones
+            # actually have.
+            others = [item for item in attributes if item.pk != attribute.pk]
+            narrowed = apply_attribute_filters(
+                products, request.query_params, others
+            )
+            narrowed = apply_common_filters(narrowed, request.query_params)
+            # No ORDER BY inside the subquery below; it would be dead work.
+            narrowed = narrowed.order_by()
+
+            # filter() before annotate() makes Count run over the narrowed
+            # relation instead of every product attached to the value.
             values = (
-                attribute.values.annotate(
-                    product_count=Count("products", filter=product_filter, distinct=True)
-                )
+                attribute.values.filter(products__in=narrowed)
+                .annotate(product_count=Count("products", distinct=True))
                 .filter(product_count__gt=0)
                 .order_by("position", "name")
             )

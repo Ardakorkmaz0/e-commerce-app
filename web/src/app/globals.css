@@ -55,11 +55,22 @@ body {
    drift apart. */
 :root {
   --site-navbar-height: 82px;
+  --site-departments-height: 50px;
+  /* Everything that pins below both bars measures from here. */
+  --site-header-offset: calc(
+    var(--site-navbar-height) + var(--site-departments-height)
+  );
 }
 
+/* Doubled class throughout: Bootstrap's `.sticky-top` sets both `top` and
+   `z-index: 1020` at the same specificity and loads after this file, so a
+   single-class rule loses the tie and both bars end up on 1020. At equal
+   z-index the later element in the DOM wins, which put the department bar
+   over the navbar's dropdown. */
 .site-navbar.sticky-top {
   position: sticky;
   top: 0;
+  z-index: 1060;
 }
 
 .site-navbar {
@@ -199,11 +210,15 @@ body {
 }
 
 .site-navbar .dropdown-menu {
+  /* Sits above the department bar (1050) and the navbar itself (1060). */
+  z-index: 1080;
   color: var(--site-text);
-  background: var(--site-navbar-bg);
+  /* Opaque, unlike the navbar: this menu overlaps the dark department bar,
+     and a translucent surface with a blur behind it made the top of the
+     menu read as an empty white band. */
+  background: var(--site-input-bg);
   border: 1px solid var(--site-navbar-border) !important;
   box-shadow: 0 16px 36px var(--site-shadow) !important;
-  backdrop-filter: blur(14px);
 }
 
 .site-navbar .dropdown-header,
@@ -808,9 +823,13 @@ body {
 
 .filter-panel {
   position: sticky;
-  top: 96px;
-  max-height: calc(100vh - 112px);
+  /* Clears both sticky bars, plus a little breathing room. */
+  top: calc(var(--site-header-offset) + 1rem);
+  /* Its own scrollbar: the filter list is far taller than the viewport,
+     so the panel scrolls internally instead of running off the screen. */
+  max-height: calc(100vh - var(--site-header-offset) - 2rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding: 0.75rem 1rem 1rem;
   background: var(--site-navbar-bg);
@@ -1044,6 +1063,56 @@ body {
 .filter-count {
   color: var(--site-muted-text);
   font-size: 0.75rem;
+}
+
+/* ── Back to top ────────────────────────────────────────────────────── */
+
+.scroll-to-top {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--site-action-start), var(--site-action-end));
+  border: 1px solid transparent;
+  border-radius: 50%;
+  box-shadow: 0 10px 24px var(--site-accent-shadow);
+  /* Kept in the DOM but inert until scrolled, so it can fade rather than
+     pop in. pointer-events stops it swallowing clicks while invisible. */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.scroll-to-top.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.scroll-to-top:hover,
+.scroll-to-top:focus-visible {
+  color: #ffffff;
+  filter: brightness(1.08);
+}
+
+.scroll-to-top:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring), 0 10px 24px var(--site-accent-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-to-top {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ── Seller panel ───────────────────────────────────────────────────── */
@@ -1294,9 +1363,12 @@ body {
 .marketplace-departments.sticky-top {
   position: sticky;
   top: var(--site-navbar-height);
+  z-index: 1050;
 }
 
 .marketplace-departments {
+  /* Pinned so the offset variable above stays truthful. */
+  min-height: var(--site-departments-height);
   z-index: 1050;
   margin-top: 1.5rem;
   color: #e2e8f0;
@@ -1377,7 +1449,6 @@ body {
 }
 
 .marketplace-page .filter-panel {
-  top: 92px;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
@@ -1614,15 +1685,23 @@ body {
     justify-content: space-between;
   }
 
-  /* Below lg the navbar is collapsible, so its height changes when the menu
-     opens and a fixed offset would leave a gap or overlap. The department
-     bar pins to the top on its own instead. */
+  /* Below lg the navbar collapses and its height changes when the menu
+     opens, so no fixed offset can keep the department bar under it. Pinning
+     both to 0 made them overlap — the bar showed through the translucent
+     navbar. It scrolls away with the content instead, and the navbar alone
+     stays pinned. */
   .marketplace-departments.sticky-top {
-    top: 0;
+    position: static;
   }
 
   .site-navbar {
     min-height: 0;
+  }
+
+  /* Only the navbar is sticky here, so anything pinned below it clears
+     that alone. */
+  :root {
+    --site-header-offset: var(--site-navbar-height);
   }
 }
 

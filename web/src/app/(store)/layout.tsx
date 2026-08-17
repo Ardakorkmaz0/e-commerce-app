@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { SiteNavbar } from "@/components/site-navbar";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -17,6 +18,7 @@ export default async function StoreLayout({ children }: StoreLayoutProps) {
     <>
       <SiteNavbar user={user} />
       {children}
+      <ScrollToTop />
     </>
   );
 }
