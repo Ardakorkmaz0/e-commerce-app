@@ -84,8 +84,7 @@ class _SellerRatingBarState extends ConsumerState<SellerRatingBar> {
                     minHeight: 30,
                   ),
                   tooltip: '$star',
-                  onPressed:
-                      _saving ? null : () => _submit(star, data.score),
+                  onPressed: _saving ? null : () => _submit(star, data.score),
                   icon: Icon(
                     (data.score ?? 0) >= star ? Icons.star : Icons.star_border,
                     size: 22,

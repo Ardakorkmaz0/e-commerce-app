@@ -17,7 +17,10 @@ class ProfileTab extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: authState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -41,6 +44,19 @@ class ProfileTab extends ConsumerWidget {
                 // push (not go) so the screen stacks and can be popped back
                 onTap: () => context.pushNamed('editProfile'),
               ),
+              ListTile(
+                leading: const Icon(Icons.location_on_outlined),
+                title: const Text('Delivery addresses'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.pushNamed('addresses'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.credit_card_outlined),
+                title: const Text('Payment methods'),
+                subtitle: const Text('Coming soon'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.pushNamed('paymentMethods'),
+              ),
               // Sellers manage their catalog here, the same way they do at
               // /seller on the web. There is deliberately no Django admin
               // entry: the admin is an internal tool, not part of the app.
@@ -54,7 +70,10 @@ class ProfileTab extends ConsumerWidget {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Sign out', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Sign out',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () async {
                   await ref.read(authProvider.notifier).signOut();
                   if (context.mounted) context.goNamed('signIn');
@@ -98,7 +117,10 @@ class _ProfileHeader extends StatelessWidget {
             children: [
               Text(
                 user.displayName, // "First Last" or username if no name set
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
               const SizedBox(height: 4),
               Text(

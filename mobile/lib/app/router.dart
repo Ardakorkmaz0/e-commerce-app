@@ -1,8 +1,12 @@
+import 'package:ecommerce_mobile/features/addresses/data/models/delivery_address_model.dart';
+import 'package:ecommerce_mobile/features/addresses/presentation/address_form_screen.dart';
+import 'package:ecommerce_mobile/features/addresses/presentation/address_list_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/edit_profile_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_in_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_up_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/splash_screen.dart';
 import 'package:ecommerce_mobile/features/main/presentation/main_screen.dart';
+import 'package:ecommerce_mobile/features/payments/presentation/payment_methods_screen.dart';
 import 'package:ecommerce_mobile/features/products/presentation/product_detail_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_product_form_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_products_screen.dart';
@@ -38,13 +42,36 @@ final GoRouter appRouter = GoRouter(
       name: 'editProfile',
       builder: (context, state) => const EditProfileScreen(),
     ),
+    GoRoute(
+      path: '/profile/addresses',
+      name: 'addresses',
+      builder: (context, state) => const AddressListScreen(),
+    ),
+    GoRoute(
+      path: '/profile/addresses/new',
+      name: 'addressNew',
+      builder: (context, state) => const AddressFormScreen(),
+    ),
+    // Declared after /new so the literal segment is not captured as an id.
+    // The address travels in `extra` because the list already has it; the
+    // screen falls back to the add form if it arrives empty (deep link).
+    GoRoute(
+      path: '/profile/addresses/:id/edit',
+      name: 'addressEdit',
+      builder: (context, state) =>
+          AddressFormScreen(address: state.extra as DeliveryAddress?),
+    ),
+    GoRoute(
+      path: '/profile/payment-methods',
+      name: 'paymentMethods',
+      builder: (context, state) => const PaymentMethodsScreen(),
+    ),
     // Slug rather than id, matching the backend's lookup_field.
     GoRoute(
       path: '/products/:slug',
       name: 'productDetail',
-      builder: (context, state) => ProductDetailScreen(
-        slug: state.pathParameters['slug']!,
-      ),
+      builder: (context, state) =>
+          ProductDetailScreen(slug: state.pathParameters['slug']!),
     ),
 
     // Seller panel. Declared before /seller/:slug/edit so the literal
@@ -62,9 +89,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/seller/:slug/edit',
       name: 'sellerProductEdit',
-      builder: (context, state) => SellerProductFormScreen(
-        slug: state.pathParameters['slug'],
-      ),
+      builder: (context, state) =>
+          SellerProductFormScreen(slug: state.pathParameters['slug']),
     ),
   ],
 );

@@ -1,4 +1,5 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/features/addresses/presentation/widgets/selected_address_button.dart';
 import 'package:ecommerce_mobile/features/products/presentation/filter_sheet.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
 import 'package:ecommerce_mobile/shared/widgets/product_card.dart';
@@ -34,7 +35,8 @@ class _ProductsTabState extends ConsumerState<ProductsTab> {
     final position = _scrollController.position;
     // Start the next page before the shopper reaches the very bottom.
     if (position.pixels >= position.maxScrollExtent - 400) {
-      ref.read(productListProvider(ref.read(productQueryProvider)).notifier)
+      ref
+          .read(productListProvider(ref.read(productQueryProvider)).notifier)
           .loadMore();
     }
   }
@@ -86,6 +88,10 @@ class _ProductsTabState extends ConsumerState<ProductsTab> {
           ),
           const SizedBox(width: 4),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(48),
+          child: SelectedAddressButton(),
+        ),
       ),
       body: listing.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -94,8 +100,8 @@ class _ProductsTabState extends ConsumerState<ProductsTab> {
           if (state.items.isEmpty) {
             return _EmptyResults(
               onClear: query.hasFilters
-                  ? () => ref.read(productQueryProvider.notifier).state =
-                        query.cleared()
+                  ? () => ref.read(productQueryProvider.notifier).state = query
+                        .cleared()
                   : null,
             );
           }
@@ -160,14 +166,14 @@ class _ProductsTabState extends ConsumerState<ProductsTab> {
                       child: state.loadingMore
                           ? const CircularProgressIndicator()
                           : state.hasNext
-                              ? const SizedBox.shrink()
-                              : Text(
-                                  'That is everything.',
-                                  style: TextStyle(
-                                    color: AppColors.mutedText,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                          ? const SizedBox.shrink()
+                          : Text(
+                              'That is everything.',
+                              style: TextStyle(
+                                color: AppColors.mutedText,
+                                fontSize: 12,
+                              ),
+                            ),
                     ),
                   ),
                 ),

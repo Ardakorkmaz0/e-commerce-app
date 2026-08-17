@@ -48,6 +48,18 @@ export default async function ProfilePage() {
         <Link className="list-group-item list-group-item-action" href="/myorders">
           My Orders
         </Link>
+        <Link
+          className="list-group-item list-group-item-action"
+          href="/profile/addresses"
+        >
+          Addresses
+        </Link>
+        <Link
+          className="list-group-item list-group-item-action"
+          href="/profile/payment-methods"
+        >
+          Payment Methods
+        </Link>
         <Link className="list-group-item list-group-item-action" href="/profile/edit">
           Edit Profile
         </Link>

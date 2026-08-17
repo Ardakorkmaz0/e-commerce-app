@@ -157,14 +157,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // Wrap, not Row: on a narrow screen the prompt and the
+                      // button together overflowed the card instead of
+                      // falling onto a second line.
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
                         children: [
                           Text(
                             "Don't have an account?",
                             style: TextStyle(color: AppColors.mutedText),
                           ),
-                          const SizedBox(width: 6),
                           TextButton(
                             onPressed: () => context.pushNamed('signUp'),
                             style: TextButton.styleFrom(

@@ -105,7 +105,10 @@ body {
 }
 
 .site-search {
-  width: min(100%, 560px);
+  flex: 1 1 340px;
+  width: auto;
+  min-width: 240px;
+  max-width: 560px;
 }
 
 /* Department picker glued to the left of the input */
@@ -160,6 +163,7 @@ body {
   transform: translateY(-1px);
 }
 
+.site-address-button,
 .site-cart-button,
 .site-account-button {
   color: var(--site-control-text);
@@ -169,11 +173,52 @@ body {
   font-weight: 600;
 }
 
+.site-address-button:hover,
 .site-cart-button:hover,
 .site-account-button:hover {
   color: var(--site-accent-hover);
   background: var(--site-control-hover-bg);
   border-color: var(--site-accent-hover);
+}
+
+.site-address-button {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  height: 44px;
+  padding: 0.3rem 0.65rem;
+  text-align: left;
+}
+
+.site-address-button svg {
+  flex: 0 0 auto;
+}
+
+.site-address-button-desktop {
+  flex: 0 1 150px;
+  min-width: 112px;
+  max-width: 150px;
+}
+
+.site-address-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.site-address-copy small {
+  color: var(--site-muted-text);
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.site-address-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .site-theme-button {
@@ -203,6 +248,7 @@ body {
   display: block;
 }
 
+.site-address-button:focus-visible,
 .site-cart-button:focus-visible,
 .site-account-button:focus-visible,
 .site-theme-button:focus-visible {
@@ -230,6 +276,153 @@ body {
 .site-navbar .dropdown-item:focus {
   color: var(--site-accent-hover);
   background: var(--site-control-hover-bg);
+}
+
+/* Doubled class, like the other Bootstrap overrides in this file: a single
+   `.site-address-modal` ties with Bootstrap's own `.modal { z-index: 1055 }`
+   and loses, because the CDN stylesheet loads after this one. The backdrop
+   below then sat on top of the dialog, which read as a greyed-out modal
+   that would not accept clicks. `#cartModal` is an id, so it already won. */
+.modal.site-address-modal,
+#cartModal {
+  z-index: 1090;
+}
+
+.modal-backdrop.modal-backdrop {
+  z-index: 1085;
+}
+
+.address-modal-content {
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px var(--site-shadow);
+}
+
+.address-modal-content .modal-header {
+  border-bottom-color: var(--site-navbar-border);
+}
+
+.address-modal-eyebrow {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--site-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.address-selector-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.address-choice {
+  padding: 0.9rem;
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-border);
+  border-radius: 12px;
+}
+
+.address-choice.selected {
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 2px var(--site-focus-ring);
+}
+
+.address-choice-heading,
+.address-choice-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.address-choice-heading {
+  justify-content: space-between;
+}
+
+.address-choice-recipient,
+.address-current-note {
+  color: var(--site-muted-text);
+  font-size: 0.75rem;
+}
+
+.address-choice-lines {
+  margin: 0.55rem 0 0.75rem;
+  color: var(--site-nav-text);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.address-default-badge {
+  display: inline-flex;
+  padding: 0.18rem 0.45rem;
+  color: var(--site-accent-hover);
+  background: var(--site-control-hover-bg);
+  border: 1px solid var(--site-focus-ring);
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.address-selector-empty {
+  display: flex;
+  align-items: center;
+  min-height: 180px;
+  padding: 1.5rem;
+  color: var(--site-muted-text);
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.address-selector-empty svg {
+  margin-bottom: 0.6rem;
+  color: var(--site-accent);
+}
+
+.address-selector-empty strong {
+  margin-bottom: 0.25rem;
+  color: var(--site-text);
+}
+
+.address-selector-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--site-navbar-border);
+  flex-wrap: wrap;
+}
+
+.address-action-message {
+  flex-basis: 100%;
+  margin: 0.55rem 0 0;
+  font-size: 0.75rem;
+}
+
+.address-action-message.success {
+  color: #15803d;
+}
+
+.address-action-message.error {
+  color: #dc2626;
+}
+
+[data-bs-theme="dark"] .address-action-message.success {
+  color: #86efac;
+}
+
+[data-bs-theme="dark"] .address-action-message.error {
+  color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .address-modal-content .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
 }
 
 .signin-page {
@@ -347,6 +540,18 @@ body {
   }
 
   .site-search {
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .site-navbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .site-address-button-mobile {
+    flex: 1 0 100%;
     width: 100%;
   }
 }
@@ -363,6 +568,7 @@ body {
     border-radius: 999px 0 0 999px;
     padding-inline-start: 1rem;
   }
+
 }
 
 @media (max-width: 575.98px) {
@@ -374,6 +580,7 @@ body {
     padding: 1.5rem;
     border-radius: 20px;
   }
+
 }
 
 /* ── Store pages — mirrors the mobile app's screens ─────────────────── */
@@ -1397,6 +1604,305 @@ body {
 [data-bs-theme="dark"] .seller-rating-message.error {
   color: #fca5a5;
 }
+
+/* Address book and payment settings */
+.address-book-page {
+  max-width: 980px;
+}
+
+.address-book-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.address-back-link {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  color: var(--site-accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.address-back-link:hover {
+  color: var(--site-accent-hover);
+  text-decoration: underline;
+}
+
+.address-book-header h1,
+.address-form-heading h1,
+.payment-methods-card h1 {
+  margin: 0;
+  color: var(--site-text);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.address-book-header h1 {
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+}
+
+.address-book-header p,
+.address-form-heading p,
+.payment-methods-card p {
+  margin: 0.35rem 0 0;
+  color: var(--site-muted-text);
+}
+
+.address-book-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.address-book-card {
+  display: flex;
+  min-width: 0;
+  padding: 1.15rem;
+  background: var(--site-navbar-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  flex-direction: column;
+}
+
+.address-book-card.selected {
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 2px var(--site-focus-ring), 0 12px 30px var(--site-shadow);
+}
+
+.address-book-card-heading,
+.address-book-card-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.address-book-card-heading {
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.address-book-card h2 {
+  margin: 0;
+  color: var(--site-text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.address-edit-link {
+  color: var(--site-accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.address-edit-link:hover {
+  color: var(--site-accent-hover);
+  text-decoration: underline;
+}
+
+.address-recipient {
+  margin-bottom: 0.35rem;
+  color: var(--site-nav-text);
+  font-size: 0.86rem;
+}
+
+.address-book-card address {
+  margin: 0;
+  color: var(--site-muted-text);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.address-phone {
+  margin-top: 0.55rem;
+  color: var(--site-nav-text);
+  font-size: 0.82rem;
+}
+
+.address-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.address-card-actions .btn-link {
+  padding-inline: 0.45rem;
+  text-decoration: none;
+}
+
+.address-choice .btn-outline-primary,
+.address-card-actions .btn-outline-primary {
+  color: var(--site-accent);
+  border-color: var(--site-accent);
+}
+
+.address-choice .btn-outline-primary:hover,
+.address-card-actions .btn-outline-primary:hover {
+  color: #ffffff;
+  background: var(--site-accent);
+  border-color: var(--site-accent);
+}
+
+.address-book-empty {
+  display: flex;
+  align-items: center;
+  min-height: 340px;
+  padding: 2rem;
+  color: var(--site-muted-text);
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.address-book-empty svg {
+  margin-bottom: 0.75rem;
+  color: var(--site-accent);
+}
+
+.address-book-empty h2 {
+  margin-bottom: 0.35rem;
+  color: var(--site-text);
+  font-size: 1.25rem;
+}
+
+.address-book-empty p {
+  margin-bottom: 1rem;
+}
+
+.address-form-page {
+  max-width: 720px;
+}
+
+.address-form-heading {
+  margin-bottom: 1.4rem;
+}
+
+.address-form-heading > span,
+.payment-coming-soon {
+  display: inline-block;
+  margin-bottom: 0.3rem;
+  color: var(--site-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.address-form-heading h1 {
+  font-size: 1.65rem;
+}
+
+.address-form .form-label {
+  color: var(--site-nav-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.address-form .form-control {
+  color: var(--site-text);
+  background: var(--site-input-bg);
+  border-color: var(--site-border);
+}
+
+.address-form .form-control:focus {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.address-optional {
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.payment-methods-page {
+  max-width: 720px;
+}
+
+.payment-methods-card {
+  display: flex;
+  align-items: center;
+  min-height: 390px;
+  padding: 2.5rem;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.payment-methods-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 1rem;
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 20px;
+}
+
+.payment-methods-card h1 {
+  font-size: 1.6rem;
+}
+
+.payment-methods-card p {
+  max-width: 480px;
+  margin-bottom: 1.2rem;
+  line-height: 1.6;
+}
+
+.payment-methods-card .btn:disabled {
+  color: var(--site-muted-text);
+  background: var(--site-control-bg);
+  border-color: var(--site-border);
+  opacity: 1;
+}
+
+@media (max-width: 767.98px) {
+  .address-book-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .address-book-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .address-book-header > .btn {
+    width: 100%;
+  }
+
+  .address-choice-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .address-selector-links {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .address-form-page .profile-card,
+  .payment-methods-card {
+    padding: 1.25rem !important;
+  }
+
+  .payment-methods-card {
+    min-height: 340px;
+  }
+}
+
 .product-card-link {
   display: block;
   height: 100%;

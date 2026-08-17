@@ -1,4 +1,5 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/features/addresses/presentation/widgets/selected_address_button.dart';
 import 'package:ecommerce_mobile/features/main/presentation/providers/tab_provider.dart';
 import 'package:ecommerce_mobile/features/products/data/models/product_model.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
@@ -63,8 +64,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             alignment: Alignment.center,
             children: <Widget>[
               IconButton(
-                onPressed: () => ref.read(selectedTabProvider.notifier).state =
-                    MainTab.cart,
+                onPressed: () =>
+                    ref.read(selectedTabProvider.notifier).state = MainTab.cart,
                 icon: const Icon(Icons.shopping_cart_outlined),
                 tooltip: 'Cart',
               ),
@@ -91,6 +92,10 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           ),
           const SizedBox(width: 4),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(48),
+          child: SelectedAddressButton(),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -111,15 +116,15 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   hintText: 'Search products...',
                   leading: const Icon(Icons.search),
                   onSubmitted: (value) {
-                    ref.read(productQueryProvider.notifier).state =
-                        query.copyWith(search: value.trim());
+                    ref.read(productQueryProvider.notifier).state = query
+                        .copyWith(search: value.trim());
                   },
                   onChanged: (value) {
                     // Clearing the box restores the full list without
                     // needing to submit.
                     if (value.isEmpty && query.search.isNotEmpty) {
-                      ref.read(productQueryProvider.notifier).state =
-                          query.copyWith(search: '');
+                      ref.read(productQueryProvider.notifier).state = query
+                          .copyWith(search: '');
                     }
                   },
                   padding: const WidgetStatePropertyAll<EdgeInsets>(
@@ -164,9 +169,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ),
-                  error: (_, _) => const Center(
-                    child: Text('Could not load categories.'),
-                  ),
+                  error: (_, _) =>
+                      const Center(child: Text('Could not load categories.')),
                   data: (List<Category> items) {
                     // "All" is a UI-only entry that clears the filter.
                     final labels = <String?>[null, ...items.map((c) => c.slug)];
@@ -214,9 +218,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         isSearching
                             ? 'Results for "${query.search}"'
                             : 'Featured Products',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                     if (isSearching)
@@ -297,14 +300,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     child: products.valueOrNull?.loadingMore ?? false
                         ? const CircularProgressIndicator()
                         : (products.valueOrNull?.hasNext ?? false)
-                              ? const SizedBox.shrink()
-                              : const Text(
-                                  'That is everything.',
-                                  style: TextStyle(
-                                    color: AppColors.mutedText,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                        ? const SizedBox.shrink()
+                        : const Text(
+                            'That is everything.',
+                            style: TextStyle(
+                              color: AppColors.mutedText,
+                              fontSize: 12,
+                            ),
+                          ),
                   ),
                 ),
               )
@@ -315,9 +318,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
                   child: OutlinedButton.icon(
-                    onPressed: () => ref
-                        .read(selectedTabProvider.notifier)
-                        .state = MainTab.products,
+                    onPressed: () =>
+                        ref.read(selectedTabProvider.notifier).state =
+                            MainTab.products,
                     icon: const Icon(Icons.grid_view_outlined, size: 18),
                     label: const Text('See all products'),
                     style: OutlinedButton.styleFrom(

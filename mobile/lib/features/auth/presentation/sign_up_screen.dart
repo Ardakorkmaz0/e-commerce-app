@@ -197,14 +197,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // Wrap for the same reason as the sign-in screen: the
+                      // prompt plus the button overflows a narrow card.
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
                         children: [
                           Text(
                             'Already have an account?',
                             style: TextStyle(color: AppColors.mutedText),
                           ),
-                          const SizedBox(width: 6),
                           TextButton(
                             onPressed: () => context.goNamed('signIn'),
                             style: TextButton.styleFrom(

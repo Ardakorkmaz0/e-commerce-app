@@ -138,7 +138,8 @@ class _SellerProductFormScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Back',
-          onPressed: () => context.canPop() ? context.pop() : context.goNamed('main'),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.goNamed('main'),
         ),
         title: Text(
           _isEdit ? 'Edit Product' : 'Add Product',
@@ -147,7 +148,8 @@ class _SellerProductFormScreenState
       ),
       body: categories.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const Center(child: Text('Could not load categories.')),
+        error: (_, _) =>
+            const Center(child: Text('Could not load categories.')),
         data: (List<Category> categoryList) {
           return existing.when(
             loading: () => const Center(child: CircularProgressIndicator()),

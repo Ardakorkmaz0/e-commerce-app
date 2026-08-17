@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group
 
-from .models import User
+from .models import DeliveryAddress, User
 
 SELLER_GROUP = "Sellers"
 
@@ -44,6 +44,33 @@ class CustomUserAdmin(UserAdmin):
     @admin.display(description="Groups")
     def group_names(self, obj):
         return ", ".join(group.name for group in obj.groups.all()) or "—"
+
+
+@admin.register(DeliveryAddress)
+class DeliveryAddressAdmin(admin.ModelAdmin):
+    list_display = (
+        "label",
+        "recipient_name",
+        "user",
+        "city",
+        "district",
+        "is_default",
+        "updated_at",
+    )
+    list_filter = ("is_default", "country_code")
+    search_fields = (
+        "label",
+        "recipient_name",
+        "phone_number",
+        "city",
+        "district",
+        "user__username",
+        "user__email",
+    )
+    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+    list_select_related = ("user",)
+    date_hierarchy = "updated_at"
 
 
 # Django's Group admin does not show who belongs to a group, so replace it.

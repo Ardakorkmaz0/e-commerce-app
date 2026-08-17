@@ -2,9 +2,16 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { signOut } from "@/app/auth-actions";
+import {
+  fetchAddresses,
+  formatAddressDestination,
+  getSelectedAddress,
+  type Address,
+} from "@/lib/addresses";
 import type { AuthenticatedUser } from "@/lib/auth";
 import { fetchCategories } from "@/lib/products";
 
+import { AddressSelector } from "./address-selector";
 import { CategorySelect } from "./category-select";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -12,10 +19,48 @@ type SiteNavbarProps = {
   user: AuthenticatedUser;
 };
 
+type AddressTriggerProps = {
+  address: Address | null;
+  className: string;
+};
+
+function AddressTrigger({ address, className }: AddressTriggerProps) {
+  const destination = formatAddressDestination(address);
+
+  return (
+    <button
+      type="button"
+      className={`btn site-address-button ${className}`}
+      data-bs-toggle="modal"
+      data-bs-target="#addressModal"
+      aria-label={`Choose delivery address. Current destination: ${destination}`}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        fill="currentColor"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path d="M12.166 8.94c-.57 1.166-1.755 2.587-2.722 3.704C8.46 13.78 8 14.5 8 14.5s-.46-.72-1.444-1.856c-.967-1.117-2.152-2.538-2.722-3.704C3.287 7.82 3 6.742 3 5.75a5 5 0 0 1 10 0c0 .992-.287 2.07-.834 3.19M8 8a2.25 2.25 0 1 0 0-4.5A2.25 2.25 0 0 0 8 8" />
+      </svg>
+      <span className="site-address-copy">
+        <small>Deliver to</small>
+        <strong>{destination}</strong>
+      </span>
+    </button>
+  );
+}
+
 export async function SiteNavbar({ user }: SiteNavbarProps) {
   // Categories come from the database so the dropdown always matches
   // whatever exists in the admin panel.
-  const categories = await fetchCategories();
+  const [categories, addresses] = await Promise.all([
+    fetchCategories(),
+    fetchAddresses(),
+  ]);
+  const selectedAddress = getSelectedAddress(addresses);
 
   return (
     <>
@@ -36,6 +81,11 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
             </span>
           </Link>
 
+          <AddressTrigger
+            address={selectedAddress}
+            className="site-address-button-desktop d-none d-lg-flex"
+          />
+
           <button
             className="navbar-toggler border-0 shadow-none"
             type="button"
@@ -52,7 +102,7 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
               around, so it must never sit behind the hamburger. On small
               screens it drops onto its own full-width row. */}
           <form
-            className="site-search d-flex order-3 order-lg-0 ms-lg-4 me-lg-3 mt-2 mt-lg-0"
+            className="site-search d-flex order-3 order-lg-0 ms-lg-2 me-lg-3 mt-2 mt-lg-0"
             method="get"
             action="/products"
             role="search"
@@ -87,7 +137,12 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
           </form>
 
           <div className="collapse navbar-collapse" id="mainNavbar">
-            <div className="d-flex align-items-center justify-content-end gap-2 ms-lg-auto py-2 py-lg-0">
+            <div className="site-navbar-actions d-flex align-items-center justify-content-end gap-2 ms-lg-auto py-2 py-lg-0">
+              <AddressTrigger
+                address={selectedAddress}
+                className="site-address-button-mobile d-flex d-lg-none"
+              />
+
               <button
                 type="button"
                 className="btn site-cart-button position-relative"
@@ -126,6 +181,16 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
                   <li>
                     <Link className="dropdown-item" href="/myorders">My Orders</Link>
                   </li>
+                  <li>
+                    <Link className="dropdown-item" href="/profile/addresses">
+                      Addresses
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item" href="/profile/payment-methods">
+                      Payment Methods
+                    </Link>
+                  </li>
                   {user.is_seller ? (
                     <li>
                       <Link className="dropdown-item" href="/seller">My Products</Link>
@@ -152,6 +217,36 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
           </div>
         </div>
       </nav>
+
+      <div
+        className="modal fade site-address-modal"
+        id="addressModal"
+        tabIndex={-1}
+        aria-labelledby="addressModalLabel"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div className="modal-content address-modal-content">
+            <div className="modal-header">
+              <div>
+                <span className="address-modal-eyebrow">Delivery destination</span>
+                <h1 className="modal-title fs-5" id="addressModalLabel">
+                  Choose your address
+                </h1>
+              </div>
+              <button
+                type="button"
+                className="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              />
+            </div>
+            <div className="modal-body">
+              <AddressSelector addresses={addresses} />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div
         className="modal fade"
