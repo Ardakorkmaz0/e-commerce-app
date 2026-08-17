@@ -17,6 +17,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _storeNameController = TextEditingController();
   bool _loading = false;
   String? _errorMessage;
   bool _saved = false;
@@ -30,6 +31,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _firstNameController.text = user.firstName;
       _lastNameController.text = user.lastName;
       _emailController.text = user.email;
+      _storeNameController.text = user.storeName;
     }
   }
 
@@ -38,6 +40,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _storeNameController.dispose();
     super.dispose();
   }
 
@@ -49,10 +52,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     });
 
     // Calls PATCH /api/v1/auth/me/ and updates the Riverpod state
+    // store_name is only sent for sellers; the backend ignores it for
+    // everyone else, but there is no reason to send it.
+    final isSeller = ref.read(authProvider).valueOrNull?.isSeller ?? false;
+
     final error = await ref.read(authProvider.notifier).updateProfile(
           email: _emailController.text.trim(),
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
+          storeName: isSeller ? _storeNameController.text.trim() : null,
         );
 
     if (!mounted) return;
@@ -165,6 +173,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
             ),
+
+            // Store profile, matching the web's seller fields.
+            if (user?.isSeller ?? false) ...[
+              const SizedBox(height: 16),
+              _Field(label: 'Store name', controller: _storeNameController),
+              if (user?.isVerifiedSeller ?? false)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.verified, size: 16, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        'Verified seller',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+
             const SizedBox(height: 28),
 
             GradientButton(

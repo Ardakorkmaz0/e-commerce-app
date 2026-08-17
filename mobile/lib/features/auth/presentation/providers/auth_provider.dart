@@ -61,12 +61,14 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     String? email,
     String? firstName,
     String? lastName,
+    String? storeName,
   }) async {
     final result = await AsyncValue.guard(
       () => ref.read(authRepositoryProvider).updateProfile(
             email: email,
             firstName: firstName,
             lastName: lastName,
+            storeName: storeName,
           ),
     );
     if (!result.hasError) state = result;

@@ -78,6 +78,7 @@ class AuthRepository {
     String? email,
     String? firstName,
     String? lastName,
+    String? storeName,
   }) async {
     final access = await _tokenStorage.readAccessToken();
     if (access == null) throw Exception('Not authenticated');
@@ -88,6 +89,7 @@ class AuthRepository {
         if (email != null) 'email': email,
         if (firstName != null) 'first_name': firstName,
         if (lastName != null) 'last_name': lastName,
+        if (storeName != null) 'store_name': storeName,
       },
       options: _auth(access),
     );

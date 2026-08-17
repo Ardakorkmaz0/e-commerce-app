@@ -41,12 +41,15 @@ class ProfileTab extends ConsumerWidget {
                 // push (not go) so the screen stacks and can be popped back
                 onTap: () => context.pushNamed('editProfile'),
               ),
-              if (user.isStaff)
+              // Sellers manage their catalog here, the same way they do at
+              // /seller on the web. There is deliberately no Django admin
+              // entry: the admin is an internal tool, not part of the app.
+              if (user.isSeller)
                 ListTile(
-                  leading: const Icon(Icons.admin_panel_settings_outlined),
-                  title: const Text('Admin Panel'),
+                  leading: const Icon(Icons.storefront_outlined),
+                  title: const Text('My Products'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {}, // TODO: open Django admin in browser
+                  onTap: () => context.pushNamed('sellerProducts'),
                 ),
               const Divider(),
               ListTile(

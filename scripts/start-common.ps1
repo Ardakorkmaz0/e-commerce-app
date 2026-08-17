@@ -1,6 +1,8 @@
 param(
+    # "backend" starts PostgreSQL and Django only, leaving the Flutter app to
+    # be launched from Android Studio. Running both fights over the emulator.
     [Parameter(Mandatory = $true)]
-    [ValidateSet("web", "mobile", "all")]
+    [ValidateSet("backend", "web", "mobile", "all")]
     [string]$Mode
 )
 
