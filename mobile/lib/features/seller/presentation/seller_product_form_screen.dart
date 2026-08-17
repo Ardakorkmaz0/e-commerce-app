@@ -47,7 +47,7 @@ class _SellerProductFormScreenState
     super.dispose();
   }
 
-  void _prefill(Product product, List<Category> categories) {
+  void _prefill(Product product) {
     if (_prefilled) return;
     _prefilled = true;
 
@@ -56,16 +56,10 @@ class _SellerProductFormScreenState
     _priceController.text = product.price;
     _stockController.text = product.stock.toString();
     _imageUrlController.text = product.imageUrl;
-    _isActive = true;
-
-    // The public serializer sends the category name, not its id, so it is
-    // matched back to the list here.
-    for (final category in categories) {
-      if (category.slug == product.categorySlug) {
-        _categoryId = category.id;
-        break;
-      }
-    }
+    _isActive = product.isActive;
+    // The seller endpoint sends the category id directly, so there is
+    // nothing to look up.
+    _categoryId = product.categoryId;
   }
 
   /// Turns a DRF validation body into one readable line.
@@ -133,8 +127,10 @@ class _SellerProductFormScreenState
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider);
+    // The seller's own endpoint, not the public one: it also returns
+    // listings the seller has hidden from the store.
     final existing = _isEdit
-        ? ref.watch(productDetailProvider(widget.slug!))
+        ? ref.watch(sellerProductProvider(widget.slug!))
         : const AsyncValue<Product?>.data(null);
 
     return Scaffold(
@@ -158,7 +154,7 @@ class _SellerProductFormScreenState
             error: (_, _) =>
                 const Center(child: Text('Could not load this product.')),
             data: (Product? product) {
-              if (product != null) _prefill(product, categoryList);
+              if (product != null) _prefill(product);
 
               return ListView(
                 padding: const EdgeInsets.all(20),

@@ -15,6 +15,8 @@ type AttributePickerProps = {
   /** Currently selected category id; "" when nothing is chosen yet. */
   categoryId: string;
   selectedValueIds: number[];
+  /** Selection is owned by the form so it survives a failed submit. */
+  onToggle: (valueId: number) => void;
 };
 
 /**
@@ -29,6 +31,7 @@ export function AttributePicker({
   attributes,
   categoryId,
   selectedValueIds,
+  onToggle,
 }: AttributePickerProps) {
   const relevant = useMemo(() => {
     const id = Number(categoryId);
@@ -65,7 +68,8 @@ export function AttributePicker({
                   name="attribute_values"
                   value={value.id}
                   id={`value-${value.id}`}
-                  defaultChecked={selectedValueIds.includes(value.id)}
+                  checked={selectedValueIds.includes(value.id)}
+                  onChange={() => onToggle(value.id)}
                 />
                 <label className="form-check-label" htmlFor={`value-${value.id}`}>
                   {value.name}

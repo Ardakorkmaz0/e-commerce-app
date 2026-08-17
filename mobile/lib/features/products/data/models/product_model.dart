@@ -61,6 +61,8 @@ class Product {
     required this.category,
     required this.categorySlug,
     required this.imageUrl,
+    this.categoryId,
+    this.isActive = true,
     this.seller,
   });
 
@@ -78,21 +80,45 @@ class Product {
   final String category;
   final String categorySlug;
   final String imageUrl;
+
+  /// Only present on the seller endpoint, which needs it for the category
+  /// dropdown. The public catalog identifies categories by slug instead.
+  final int? categoryId;
+
+  final bool isActive;
   final SellerSummary? seller;
 
+  /// Parses both catalog shapes.
+  ///
+  /// `/products/` sends `category` as a display name plus `category_slug`,
+  /// while `/seller/products/` sends `category` as the primary key plus
+  /// `category_name`. Assuming one shape is what made the seller list fail.
   factory Product.fromJson(Map<String, dynamic> json) {
+    final rawCategory = json['category'];
+    final stock = json['stock'] as int? ?? 0;
+
+    // The seller endpoint resolves an uploaded file into image_display and
+    // leaves image_url holding the pasted link, which may be empty.
+    final display = json['image_display'] as String? ?? '';
+    final link = json['image_url'] as String? ?? '';
+
     final seller = json['seller'];
+
     return Product(
       id: json['id'] as int,
       name: json['name'] as String,
       slug: json['slug'] as String,
       description: json['description'] as String? ?? '',
       price: json['price']?.toString() ?? '0',
-      stock: json['stock'] as int? ?? 0,
-      inStock: json['in_stock'] as bool? ?? false,
-      category: json['category'] as String? ?? '',
+      stock: stock,
+      // Absent on the seller endpoint, so derive it there.
+      inStock: json['in_stock'] as bool? ?? stock > 0,
+      category: json['category_name'] as String? ??
+          (rawCategory is String ? rawCategory : ''),
+      categoryId: rawCategory is int ? rawCategory : null,
       categorySlug: json['category_slug'] as String? ?? '',
-      imageUrl: json['image_url'] as String? ?? '',
+      imageUrl: display.isNotEmpty ? display : link,
+      isActive: json['is_active'] as bool? ?? true,
       seller: seller is Map<String, dynamic>
           ? SellerSummary.fromJson(seller)
           : null,

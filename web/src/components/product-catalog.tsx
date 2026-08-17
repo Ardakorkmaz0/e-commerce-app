@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import { ActiveFilters, FilterPanel } from "@/components/filter-panel";
+import {
+  ActiveFilters,
+  FilterForm,
+  FilterPanel,
+} from "@/components/filter-panel";
 import { InfiniteProductGrid } from "@/components/infinite-product-grid";
 import { SortSelect } from "@/components/sort-select";
 import { getProductImage } from "@/lib/product-images";
@@ -58,7 +62,19 @@ export async function ProductCatalog({ searchParams }: ProductCatalogProps) {
   }
 
   const hasQuery = currentParams.size > 0;
-  const showPanel = facets.attributes.length > 0 || Boolean(facets.price.max);
+  // Categories count too. Without them the panel could be withheld on a
+  // page with no attributes, and on a phone that is the only way to pick a
+  // department — the strip is hidden there and so is the search picker.
+  const showPanel =
+    facets.categories.length > 0 ||
+    facets.attributes.length > 0 ||
+    Boolean(facets.price.max);
+
+  // Shown on the mobile Filters button. Category, search and sort are not
+  // filters in this sense: they have their own controls.
+  const activeFilterCount = [...currentParams.entries()]
+    .filter(([key]) => !["category", "q", "sort"].includes(key))
+    .reduce((total, [, value]) => total + value.split(",").filter(Boolean).length, 0);
   const departmentMap = new Map<
     string,
     { name: string; slug: string; products: typeof products }
@@ -121,7 +137,13 @@ export async function ProductCatalog({ searchParams }: ProductCatalogProps) {
         </section>
       ) : null}
 
-      <nav className="navbar navbar-expand-lg marketplace-departments sticky-top" aria-label="Shop by department">
+      {/* Hidden below lg at the markup level rather than in CSS, so the
+          rule cannot be lost to cascade order. The filter offcanvas has a
+          Department group, and the navbar search has its own picker. */}
+      <nav
+        className="navbar navbar-expand-lg marketplace-departments sticky-top d-none d-lg-flex"
+        aria-label="Shop by department"
+      >
         <div className="container marketplace-departments-inner">
           <Link
             className={`marketplace-department-link${category ? "" : " active"}`}
@@ -151,6 +173,37 @@ export async function ProductCatalog({ searchParams }: ProductCatalogProps) {
           </div>
 
           <div className="marketplace-toolbar-actions">
+            {/* Below lg the panel lives in an offcanvas, so it needs a way
+                in. Bootstrap's bundle is already loaded, so no extra
+                JavaScript is involved. */}
+            {showPanel ? (
+              <button
+                className="btn filter-toggle d-lg-none"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filterOffcanvas"
+                aria-controls="filterOffcanvas"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  fill="currentColor"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5m-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5"
+                  />
+                </svg>
+                Filters
+                {activeFilterCount > 0 ? (
+                  <span className="filter-toggle-count">{activeFilterCount}</span>
+                ) : null}
+              </button>
+            ) : null}
+
             <span className="marketplace-result-count">
               {productPage.count} product{productPage.count === 1 ? "" : "s"}
             </span>
@@ -162,12 +215,45 @@ export async function ProductCatalog({ searchParams }: ProductCatalogProps) {
 
         <div className="row g-4 mt-0">
           {showPanel ? (
-            <div className="col-12 col-lg-3 col-xl-2">
-              <FilterPanel facets={facets} searchParams={currentParams} />
-            </div>
+            <>
+              {/* Sidebar from lg up */}
+              <div className="col-lg-3 col-xl-2 d-none d-lg-block">
+                <FilterPanel facets={facets} searchParams={currentParams} />
+              </div>
+
+              {/* Same panel, slid in from the side on small screens */}
+              <div
+                className="offcanvas offcanvas-start filter-offcanvas d-lg-none"
+                tabIndex={-1}
+                id="filterOffcanvas"
+                aria-labelledby="filterOffcanvasLabel"
+              >
+                <div className="offcanvas-header">
+                  <h2 className="offcanvas-title h6 mb-0" id="filterOffcanvasLabel">
+                    Filters
+                  </h2>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    data-bs-dismiss="offcanvas"
+                    aria-label="Close"
+                  />
+                </div>
+                {/* A form, not links: on a phone nothing should apply until
+                    the footer button is pressed. */}
+                <div className="offcanvas-body p-0 d-flex flex-column">
+                  <FilterForm
+                    facets={facets}
+                    searchParams={currentParams}
+                    resultCount={productPage.count}
+                  />
+                </div>
+              </div>
+            </>
           ) : null}
 
           <div className={showPanel ? "col-12 col-lg-9 col-xl-10" : "col-12"}>
+
             {products.length ? (
               <InfiniteProductGrid
                 initialPage={productPage}

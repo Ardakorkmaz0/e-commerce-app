@@ -47,10 +47,34 @@ export function ProductForm({
 }: ProductFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
-  // Tracked in state because the filter checkboxes below depend on it.
+  // Every field is controlled rather than relying on defaultValue.
+  // React resets an uncontrolled form once the action settles, which wiped
+  // out everything the seller had typed whenever validation failed. Values
+  // held in state survive that reset and re-render straight away.
+  const [values, setValues] = useState({
+    name: defaults?.name ?? "",
+    price: defaults?.price ?? "",
+    stock: String(defaults?.stock ?? 0),
+    description: defaults?.description ?? "",
+    imageUrl: defaults?.image_url ?? "",
+    isActive: defaults?.is_active ?? true,
+  });
+
+  // Also drives the filter checkboxes below.
   const [categoryId, setCategoryId] = useState(
     defaults?.category ? String(defaults.category) : "",
   );
+
+  const [selectedValues, setSelectedValues] = useState<number[]>(
+    defaults?.attribute_values ?? [],
+  );
+
+  function update<K extends keyof typeof values>(
+    field: K,
+    value: (typeof values)[K],
+  ) {
+    setValues((current) => ({ ...current, [field]: value }));
+  }
 
   return (
     <form action={formAction} className="profile-form">
@@ -70,7 +94,8 @@ export function ProductForm({
           name="name"
           maxLength={200}
           required
-          defaultValue={defaults?.name}
+          value={values.name}
+          onChange={(event) => update("name", event.target.value)}
         />
         <FieldError errors={state.errors.name} />
       </div>
@@ -88,7 +113,8 @@ export function ProductForm({
             step="0.01"
             min="0.01"
             required
-            defaultValue={defaults?.price}
+            value={values.price}
+            onChange={(event) => update("price", event.target.value)}
           />
           <FieldError errors={state.errors.price} />
         </div>
@@ -104,7 +130,8 @@ export function ProductForm({
             type="number"
             min="0"
             required
-            defaultValue={defaults?.stock ?? 0}
+            value={values.stock}
+            onChange={(event) => update("stock", event.target.value)}
           />
           <FieldError errors={state.errors.stock} />
         </div>
@@ -141,7 +168,14 @@ export function ProductForm({
           <AttributePicker
             attributes={attributes}
             categoryId={categoryId}
-            selectedValueIds={defaults?.attribute_values ?? []}
+            selectedValueIds={selectedValues}
+            onToggle={(valueId) =>
+              setSelectedValues((current) =>
+                current.includes(valueId)
+                  ? current.filter((item) => item !== valueId)
+                  : [...current, valueId],
+              )
+            }
           />
         </div>
         <FieldError errors={state.errors.attribute_values} />
@@ -156,7 +190,8 @@ export function ProductForm({
           id="description"
           name="description"
           rows={4}
-          defaultValue={defaults?.description}
+          value={values.description}
+          onChange={(event) => update("description", event.target.value)}
         />
         <FieldError errors={state.errors.description} />
       </div>
@@ -188,7 +223,8 @@ export function ProductForm({
           name="image_url"
           type="url"
           placeholder="https://..."
-          defaultValue={defaults?.image_url}
+          value={values.imageUrl}
+          onChange={(event) => update("imageUrl", event.target.value)}
         />
         <FieldError errors={state.errors.image_url} />
       </div>
@@ -199,7 +235,8 @@ export function ProductForm({
           type="checkbox"
           id="is_active"
           name="is_active"
-          defaultChecked={defaults?.is_active ?? true}
+          checked={values.isActive}
+          onChange={(event) => update("isActive", event.target.checked)}
         />
         <label className="form-check-label" htmlFor="is_active">
           Visible in the store

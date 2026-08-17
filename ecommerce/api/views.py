@@ -113,11 +113,21 @@ def apply_attribute_filters(queryset, query_params, attributes):
     each call adds a separate join, so a product must satisfy all of them.
     """
     for attribute in attributes:
-        raw = query_params.get(attribute.slug, "").strip()
-        if not raw:
-            continue
+        # Two shapes reach this: the desktop panel builds comma separated
+        # links (?brand=rtx,amd) while an HTML form repeats the key
+        # (?brand=rtx&brand=amd). Accept both.
+        raw_values = (
+            query_params.getlist(attribute.slug)
+            if hasattr(query_params, "getlist")
+            else [query_params.get(attribute.slug, "")]
+        )
 
-        slugs = [slug.strip() for slug in raw.split(",") if slug.strip()]
+        slugs = [
+            slug.strip()
+            for raw in raw_values
+            for slug in raw.split(",")
+            if slug.strip()
+        ]
         if not slugs:
             continue
 

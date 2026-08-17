@@ -1,4 +1,5 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/features/main/presentation/providers/tab_provider.dart';
 import 'package:ecommerce_mobile/features/products/data/models/product_model.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
 import 'package:ecommerce_mobile/shared/widgets/product_card.dart';
@@ -7,14 +8,47 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 // Web equivalent: / (store home page) + search bar and cart icon from SiteNavbar
-class HomeTab extends ConsumerWidget {
+class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends ConsumerState<HomeTab> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // Only searches paginate here: the featured preview is capped at 8.
+    if (ref.read(productQueryProvider).search.isEmpty) return;
+    if (!_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 400) {
+      ref
+          .read(productListProvider(ref.read(productQueryProvider)).notifier)
+          .loadMore();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final query = ref.watch(productQueryProvider);
     final categories = ref.watch(categoriesProvider);
     final products = ref.watch(productListProvider(query));
+    final isSearching = query.search.isNotEmpty;
 
     return Scaffold(
       // Mobile equivalent of the web navbar
@@ -29,7 +63,8 @@ class HomeTab extends ConsumerWidget {
             alignment: Alignment.center,
             children: <Widget>[
               IconButton(
-                onPressed: () {}, // TODO: switch to cart tab
+                onPressed: () => ref.read(selectedTabProvider.notifier).state =
+                    MainTab.cart,
                 icon: const Icon(Icons.shopping_cart_outlined),
                 tooltip: 'Cart',
               ),
@@ -63,6 +98,10 @@ class HomeTab extends ConsumerWidget {
           ref.invalidate(productListProvider(query));
         },
         child: CustomScrollView(
+          controller: _scrollController,
+          // Keeps pull-to-refresh working even when the preview is short
+          // enough to fit the screen without scrolling.
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: <Widget>[
             // ── Search bar ────────────────────────────────────────────────
             SliverToBoxAdapter(
@@ -168,13 +207,37 @@ class HomeTab extends ConsumerWidget {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
               sliver: SliverToBoxAdapter(
-                child: Text(
-                  query.search.isEmpty
-                      ? 'Featured Products'
-                      : 'Results for "${query.search}"',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        isSearching
+                            ? 'Results for "${query.search}"'
+                            : 'Featured Products',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (isSearching)
+                      // Total from the API, not the number loaded so far.
+                      Text(
+                        '${products.valueOrNull?.total ?? 0} found',
+                        style: const TextStyle(
+                          color: AppColors.mutedText,
+                          fontSize: 12,
+                        ),
+                      )
+                    else
+                      // The featured list is a preview; the full catalogue
+                      // lives in the Products tab.
+                      TextButton(
+                        onPressed: () =>
+                            ref.read(selectedTabProvider.notifier).state =
+                                MainTab.products,
+                        child: const Text('See all'),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -196,9 +259,11 @@ class HomeTab extends ConsumerWidget {
                   );
                 }
 
-                // The home tab shows a preview; the Products tab has the
-                // full, infinitely scrolling list.
-                final preview = state.items.take(8).toList();
+                // A search must show everything it matched, so the preview
+                // cap only applies to the featured list.
+                final preview = isSearching
+                    ? state.items
+                    : state.items.take(8).toList();
 
                 return SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -223,7 +288,49 @@ class HomeTab extends ConsumerWidget {
               },
             ),
 
-            const SliverPadding(padding: EdgeInsets.only(bottom: 16)),
+            if (isSearching)
+              // Search results keep loading as the shopper scrolls.
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: products.valueOrNull?.loadingMore ?? false
+                        ? const CircularProgressIndicator()
+                        : (products.valueOrNull?.hasNext ?? false)
+                              ? const SizedBox.shrink()
+                              : const Text(
+                                  'That is everything.',
+                                  style: TextStyle(
+                                    color: AppColors.mutedText,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                  ),
+                ),
+              )
+            else
+              // Dead end otherwise: the preview stops at 8 products with no
+              // hint that the rest are one tab away.
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                  child: OutlinedButton.icon(
+                    onPressed: () => ref
+                        .read(selectedTabProvider.notifier)
+                        .state = MainTab.products,
+                    icon: const Icon(Icons.grid_view_outlined, size: 18),
+                    label: const Text('See all products'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

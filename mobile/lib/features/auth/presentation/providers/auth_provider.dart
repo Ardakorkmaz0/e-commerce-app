@@ -26,10 +26,18 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
   }
 
   // Returns an error message string on failure, null on success
-  Future<String?> signIn(String username, String password) async {
+  Future<String?> signIn(
+    String username,
+    String password, {
+    bool remember = false,
+  }) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(
-      () => ref.read(authRepositoryProvider).signIn(username, password),
+      () => ref.read(authRepositoryProvider).signIn(
+            username,
+            password,
+            remember: remember,
+          ),
     );
     state = result;
     return _extractError(result);

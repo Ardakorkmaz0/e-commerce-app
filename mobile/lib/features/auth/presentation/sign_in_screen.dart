@@ -45,7 +45,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     // Calls POST /api/v1/auth/token/ and stores the JWT tokens
     final error = await ref
         .read(authProvider.notifier)
-        .signIn(username, password);
+        .signIn(username, password, remember: _rememberMe);
 
     if (!mounted) return;
 

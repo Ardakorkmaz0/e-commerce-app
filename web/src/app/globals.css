@@ -351,6 +351,20 @@ body {
   }
 }
 
+@media (max-width: 767.98px) {
+  /* The department picker ate most of the bar, cutting off the input's own
+     placeholder. Category selection is available in the filter panel here,
+     so the search box gets the whole width instead. */
+  .site-search .site-search-category {
+    display: none;
+  }
+
+  .site-search .form-control {
+    border-radius: 999px 0 0 999px;
+    padding-inline-start: 1rem;
+  }
+}
+
 @media (max-width: 575.98px) {
   .signin-page {
     padding: 1rem;
@@ -817,6 +831,141 @@ body {
 
 .seller-rating-owner-note {
   color: var(--site-muted-text);
+}
+
+/* ── Filter button and offcanvas (small screens) ────────────────────── */
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-accent);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.filter-toggle:hover,
+.filter-toggle:focus-visible {
+  color: #ffffff;
+  background: var(--site-accent);
+}
+
+.filter-toggle-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  color: #ffffff;
+  background: var(--site-accent);
+  border-radius: 999px;
+  font-size: 0.7rem;
+}
+
+.filter-toggle:hover .filter-toggle-count,
+.filter-toggle:focus-visible .filter-toggle-count {
+  color: var(--site-accent);
+  background: #ffffff;
+}
+
+/* Bootstrap puts the offcanvas on 1045 and its backdrop on 1040, both below
+   the sticky navbar at 1060, so the panel opened *underneath* the header.
+   The selectors are doubled because Bootstrap's own `.offcanvas` rule has
+   the same specificity and loads after this file — a single class loses
+   the tie and the z-index never applies. */
+.offcanvas.filter-offcanvas {
+  z-index: 1070;
+  width: min(86vw, 330px);
+  color: var(--site-text);
+  background: var(--bs-body-bg);
+  border-right: 1px solid var(--site-navbar-border);
+}
+
+.offcanvas-backdrop.offcanvas-backdrop {
+  z-index: 1065;
+}
+
+.filter-offcanvas .offcanvas-header {
+  padding: 0.9rem 1.1rem;
+  background: var(--site-navbar-bg);
+  border-bottom: 1px solid var(--site-navbar-border);
+}
+
+.filter-offcanvas .offcanvas-title {
+  color: var(--site-text);
+  font-weight: 700;
+}
+
+.filter-offcanvas .offcanvas-body {
+  padding: 0.5rem 1.1rem 1rem;
+}
+
+/* Pinned so the way out is always reachable, however long the list is. */
+.filter-offcanvas-footer {
+  flex-shrink: 0;
+  padding: 0.75rem 1.1rem;
+  background: var(--site-navbar-bg);
+  border-top: 1px solid var(--site-navbar-border);
+}
+
+/* Only the group list scrolls; the footer button stays put. */
+.filter-form-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.75rem 1.1rem 1rem;
+}
+
+/* In the form the option is a <label> wrapping a real input, so the fake
+   box used by the desktop links is not needed. */
+.filter-form .filter-option {
+  cursor: pointer;
+  gap: 0.6rem;
+}
+
+.filter-form .filter-option input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--site-accent);
+}
+
+.filter-form .filter-option:has(input:checked) {
+  color: var(--site-accent);
+  font-weight: 600;
+}
+
+/* Inside the offcanvas the body already scrolls, so the panel must not pin
+   itself, add a second scrollbar, or draw its own card frame. */
+.filter-offcanvas .filter-panel {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Roomier rows: this is a touch target, not a mouse target. */
+.filter-offcanvas .filter-option {
+  padding: 0.55rem 0.35rem;
+  font-size: 0.95rem;
+}
+
+.filter-offcanvas .filter-group-title {
+  font-size: 0.75rem;
+}
+
+.filter-offcanvas .filter-panel-head:empty {
+  display: none;
+}
+
+[data-bs-theme="dark"] .filter-offcanvas .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
 }
 
 /* ── Filter panel ───────────────────────────────────────────────────── */
@@ -1685,14 +1834,8 @@ body {
     justify-content: space-between;
   }
 
-  /* Below lg the navbar collapses and its height changes when the menu
-     opens, so no fixed offset can keep the department bar under it. Pinning
-     both to 0 made them overlap — the bar showed through the translucent
-     navbar. It scrolls away with the content instead, and the navbar alone
-     stays pinned. */
-  .marketplace-departments.sticky-top {
-    position: static;
-  }
+  /* The department strip is hidden below lg by a utility class on the
+     element itself; see product-catalog.tsx. */
 
   .site-navbar {
     min-height: 0;

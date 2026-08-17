@@ -269,3 +269,9 @@ final sellerRatingProvider =
 final sellerProductsProvider = FutureProvider<List<Product>>((ref) {
   return ref.watch(productRepositoryProvider).fetchSellerProducts();
 });
+
+/// One of the seller's own listings, including hidden ones.
+final sellerProductProvider =
+    FutureProvider.family<Product, String>((ref, slug) {
+  return ref.watch(productRepositoryProvider).fetchSellerProduct(slug);
+});

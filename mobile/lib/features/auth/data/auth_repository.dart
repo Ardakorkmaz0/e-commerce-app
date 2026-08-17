@@ -18,14 +18,22 @@ class AuthRepository {
       Options(headers: {'Authorization': 'Bearer $token'});
 
   // POST /api/v1/auth/token/ → stores tokens → returns current user
-  Future<UserModel> signIn(String username, String password) async {
+  Future<UserModel> signIn(
+    String username,
+    String password, {
+    bool remember = false,
+  }) async {
     final response = await _apiClient.dio.post(
       'auth/token/',
       data: {'username': username, 'password': password},
     );
     final access = response.data['access'] as String;
     final refresh = response.data['refresh'] as String;
-    await _tokenStorage.writeTokens(accessToken: access, refreshToken: refresh);
+    await _tokenStorage.writeTokens(
+      accessToken: access,
+      refreshToken: refresh,
+      remember: remember,
+    );
     return _fetchUser(access);
   }
 
@@ -54,11 +62,40 @@ class AuthRepository {
   // Tries to restore the session from a stored token on app start.
   // Returns null if there is no token or the token is expired.
   Future<UserModel?> tryRestoreSession() async {
+    // "Remember me" was left unchecked, so the previous session ends here.
+    if (!await _tokenStorage.readRemember()) {
+      await _tokenStorage.clearTokens();
+      return null;
+    }
+
     final access = await _tokenStorage.readAccessToken();
+    final refresh = await _tokenStorage.readRefreshToken();
     if (access == null) return null;
+
     try {
       return await _fetchUser(access);
     } catch (_) {
+      // The access token only lasts 15 minutes, so an expired one after a
+      // restart is the normal case, not a failure. Try the refresh token
+      // before giving up on the session.
+      if (refresh != null) {
+        try {
+          final renewed = await _apiClient.dio.post(
+            'auth/token/refresh/',
+            data: {'refresh': refresh},
+          );
+          final access = renewed.data['access'] as String;
+          await _tokenStorage.writeTokens(
+            accessToken: access,
+            refreshToken: refresh,
+            remember: true,
+          );
+          return await _fetchUser(access);
+        } catch (_) {
+          // Refresh token is expired or blacklisted; fall through.
+        }
+      }
+
       await _tokenStorage.clearTokens();
       return null;
     }

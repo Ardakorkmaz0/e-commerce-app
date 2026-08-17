@@ -1,6 +1,7 @@
 import 'package:ecommerce_mobile/features/auth/presentation/edit_profile_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_in_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_up_screen.dart';
+import 'package:ecommerce_mobile/features/auth/presentation/splash_screen.dart';
 import 'package:ecommerce_mobile/features/main/presentation/main_screen.dart';
 import 'package:ecommerce_mobile/features/products/presentation/product_detail_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_product_form_screen.dart';
@@ -8,8 +9,15 @@ import 'package:ecommerce_mobile/features/seller/presentation/seller_products_sc
 import 'package:go_router/go_router.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/sign-in',
+  // Starts on the gate, which decides between the store and the sign-in
+  // screen once the stored session has been checked.
+  initialLocation: '/',
   routes: <RouteBase>[
+    GoRoute(
+      path: '/',
+      name: 'splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
     GoRoute(
       path: '/sign-in',
       name: 'signIn',

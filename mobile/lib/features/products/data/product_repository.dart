@@ -96,6 +96,16 @@ class ProductRepository {
         .toList();
   }
 
+  /// The seller's own copy of one listing. The public detail endpoint hides
+  /// inactive products, so editing a hidden one has to go through here.
+  Future<Product> fetchSellerProduct(String slug) async {
+    final response = await _apiClient.dio.get(
+      'seller/products/$slug/',
+      options: await _authOptions(),
+    );
+    return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<void> createProduct(Map<String, dynamic> payload) async {
     await _apiClient.dio.post(
       'seller/products/',

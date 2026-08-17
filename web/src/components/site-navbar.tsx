@@ -48,15 +48,15 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
             <span className="navbar-toggler-icon" />
           </button>
 
-          <div className="collapse navbar-collapse" id="mainNavbar">
-            {/* No nav links: the brand goes home, and the search form with its
-                department picker covers browsing. */}
-            <form
-              className="site-search d-flex ms-lg-4 me-lg-3 mb-3 mb-lg-0"
-              method="get"
-              action="/products"
-              role="search"
-            >
+          {/* Outside the collapse on purpose: search is the main way to get
+              around, so it must never sit behind the hamburger. On small
+              screens it drops onto its own full-width row. */}
+          <form
+            className="site-search d-flex order-3 order-lg-0 ms-lg-4 me-lg-3 mt-2 mt-lg-0"
+            method="get"
+            action="/products"
+            role="search"
+          >
               {/* Department picker, Amazon style. A native select keeps this
                   working without JavaScript and submits with the GET form. */}
               <label className="visually-hidden" htmlFor="searchCategory">
@@ -84,9 +84,10 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
                   <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
                 </svg>
               </button>
-            </form>
+          </form>
 
-            <div className="d-flex align-items-center justify-content-end gap-2 ms-lg-auto">
+          <div className="collapse navbar-collapse" id="mainNavbar">
+            <div className="d-flex align-items-center justify-content-end gap-2 ms-lg-auto py-2 py-lg-0">
               <button
                 type="button"
                 className="btn site-cart-button position-relative"

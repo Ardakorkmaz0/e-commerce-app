@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { FilterCountButton } from "@/components/filter-count-button";
 import type { Facets } from "@/lib/products";
 
 /**
@@ -58,9 +59,28 @@ function singleValueHref(
 type FilterPanelProps = {
   facets: Facets;
   searchParams: URLSearchParams;
+  /**
+   * Set when the panel is rendered inside the mobile offcanvas.
+   *
+   * Choosing an option navigates, which re-renders this markup and leaves
+   * Bootstrap's offcanvas instance pointing at a detached node — the panel
+   * closes but its backdrop stays behind. Dismissing on click lets
+   * Bootstrap tear itself down first. It also drops the panel's own
+   * heading, which would otherwise repeat the offcanvas title.
+   */
+  inOffcanvas?: boolean;
 };
 
-export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
+export function FilterPanel({
+  facets,
+  searchParams,
+  inOffcanvas = false,
+}: FilterPanelProps) {
+  // Note: the option links deliberately carry no data-bs-dismiss. Bootstrap
+  // calls preventDefault() on dismiss triggers that are anchors, which
+  // cancelled the navigation — the panel closed and the filter never
+  // applied. The offcanvas stays open so several values can be picked, and
+  // the footer button closes it.
   const { attributes, availability, categories, price } = facets;
 
   // Clearing keeps the category and the search text, drops everything else.
@@ -82,10 +102,17 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
 
   return (
     <aside className="filter-panel">
+      {/* The offcanvas already shows a "Filters" title, so only the clear
+          link is worth repeating there. */}
       <div className="filter-panel-head">
-        <h2 className="filter-panel-title mb-0">Filters</h2>
+        {inOffcanvas ? null : (
+          <h2 className="filter-panel-title mb-0">Filters</h2>
+        )}
         {hasActiveFilters ? (
-          <Link className="filter-clear" href={`/products?${cleared.toString()}`}>
+          <Link
+            className="filter-clear"
+            href={`/products?${cleared.toString()}`}
+          >
             Clear all
           </Link>
         ) : null}
@@ -201,7 +228,7 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
           return (
             <Link
               className={`filter-option${isSelected ? " selected" : ""}`}
-              href={singleValueHref(
+                href={singleValueHref(
                 searchParams,
                 "availability",
                 item.value,
@@ -250,6 +277,159 @@ export function FilterPanel({ facets, searchParams }: FilterPanelProps) {
         );
       })}
     </aside>
+  );
+}
+
+/**
+ * The offcanvas version: a plain GET form instead of links.
+ *
+ * Nothing is applied until the footer button submits, which is what the
+ * small-screen flow wants — tapping four values should cost one page load,
+ * not four. It stays a Server Component: the browser collects the checked
+ * inputs, and the backend accepts repeated keys (?brand=rtx&brand=amd) as
+ * well as the comma form the desktop links produce.
+ */
+export function FilterForm({
+  facets,
+  searchParams,
+  resultCount,
+}: {
+  facets: Facets;
+  searchParams: URLSearchParams;
+  resultCount: number;
+}) {
+  const { attributes, availability, categories, price } = facets;
+
+  const selectedCategory = searchParams.get("category") ?? "";
+  const selectedAvailability = searchParams.get("availability") ?? "";
+  const selectedPriceRange = searchParams.get("price_range") ?? "";
+
+  const isChecked = (key: string, value: string) =>
+    (searchParams.get(key) ?? "").split(",").includes(value);
+
+  return (
+    <form className="filter-form d-flex flex-column h-100" action="/products" method="get">
+      {/* Carried through so submitting the filters does not drop the
+          search text or the chosen sort order. */}
+      {["q", "sort"].map((key) =>
+        searchParams.get(key) ? (
+          <input type="hidden" name={key} value={searchParams.get(key)!} key={key} />
+        ) : null,
+      )}
+
+      <div className="filter-form-body">
+        <details className="filter-group" open>
+          <summary className="filter-group-title">Department</summary>
+          <label className="filter-option">
+            <input
+              type="radio"
+              name="category"
+              value=""
+              defaultChecked={selectedCategory === ""}
+            />
+            <span className="filter-label">All departments</span>
+          </label>
+          {categories.map((item) => (
+            <label className="filter-option" key={item.slug}>
+              <input
+                type="radio"
+                name="category"
+                value={item.slug}
+                defaultChecked={selectedCategory === item.slug}
+              />
+              <span className="filter-label">{item.name}</span>
+              <span className="filter-count">{item.count}</span>
+            </label>
+          ))}
+        </details>
+
+        <details className="filter-group" open>
+          <summary className="filter-group-title">Price</summary>
+          <label className="filter-option">
+            <input
+              type="radio"
+              name="price_range"
+              value=""
+              defaultChecked={selectedPriceRange === ""}
+            />
+            <span className="filter-label">Any price</span>
+          </label>
+          {price.ranges.map((item) => (
+            <label className="filter-option" key={item.slug}>
+              <input
+                type="radio"
+                name="price_range"
+                value={item.slug}
+                defaultChecked={selectedPriceRange === item.slug}
+              />
+              <span className="filter-label">{item.label}</span>
+              <span className="filter-count">{item.count}</span>
+            </label>
+          ))}
+        </details>
+
+        <details className="filter-group" open>
+          <summary className="filter-group-title">Availability</summary>
+          <label className="filter-option">
+            <input
+              type="radio"
+              name="availability"
+              value=""
+              defaultChecked={selectedAvailability === ""}
+            />
+            <span className="filter-label">Any</span>
+          </label>
+          {[
+            { value: "in_stock", label: "In stock", count: availability.in_stock },
+            { value: "low_stock", label: "Low stock", count: availability.low_stock },
+            {
+              value: "out_of_stock",
+              label: "Out of stock",
+              count: availability.out_of_stock,
+            },
+          ].map((item) => (
+            <label className="filter-option" key={item.value}>
+              <input
+                type="radio"
+                name="availability"
+                value={item.value}
+                defaultChecked={selectedAvailability === item.value}
+              />
+              <span className="filter-label">{item.label}</span>
+              <span className="filter-count">{item.count}</span>
+            </label>
+          ))}
+        </details>
+
+        {attributes.map((facet) => (
+          <details className="filter-group" key={facet.slug} open>
+            <summary className="filter-group-title">{facet.name}</summary>
+            {facet.values.map((value) => (
+              <label className="filter-option" key={value.slug}>
+                <input
+                  type="checkbox"
+                  name={facet.slug}
+                  value={value.slug}
+                  defaultChecked={isChecked(facet.slug, value.slug)}
+                />
+                <span className="filter-label">{value.name}</span>
+                <span className="filter-count">{value.count}</span>
+              </label>
+            ))}
+          </details>
+        ))}
+      </div>
+
+      <div className="filter-offcanvas-footer">
+        <div className="d-flex gap-2">
+          {/* Resets by submitting nothing but the search text. */}
+          <Link className="btn btn-outline-secondary" href="/products">
+            Clear
+          </Link>
+          <FilterCountButton initialCount={resultCount} />
+        </div>
+      </div>
+    </form>
   );
 }
 
