@@ -9,6 +9,7 @@ import {
   type Address,
 } from "@/lib/addresses";
 import type { AuthenticatedUser } from "@/lib/auth";
+import { fetchCartCount } from "@/lib/cart";
 import { fetchCategories } from "@/lib/products";
 
 import { AddressSelector } from "./address-selector";
@@ -56,9 +57,10 @@ function AddressTrigger({ address, className }: AddressTriggerProps) {
 export async function SiteNavbar({ user }: SiteNavbarProps) {
   // Categories come from the database so the dropdown always matches
   // whatever exists in the admin panel.
-  const [categories, addresses] = await Promise.all([
+  const [categories, addresses, cartCount] = await Promise.all([
     fetchCategories(),
     fetchAddresses(),
+    fetchCartCount(),
   ]);
   const selectedAddress = getSelectedAddress(addresses);
 
@@ -143,18 +145,20 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
                 className="site-address-button-mobile d-flex d-lg-none"
               />
 
-              <button
-                type="button"
+              {/* Goes straight to the cart page. The modal it used to open
+                  held placeholder text and a link to the same place. */}
+              <Link
                 className="btn site-cart-button position-relative"
-                aria-label="Shopping cart"
-                data-bs-toggle="modal"
-                data-bs-target="#cartModal"
+                href="/cart"
+                aria-label={`Shopping cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
               >
                 Cart
-                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                  0
-                </span>
-              </button>
+                {cartCount > 0 ? (
+                  <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    {cartCount}
+                  </span>
+                ) : null}
+              </Link>
 
               <div className="dropdown">
                 <button
@@ -248,30 +252,6 @@ export async function SiteNavbar({ user }: SiteNavbarProps) {
         </div>
       </div>
 
-      <div
-        className="modal fade"
-        id="cartModal"
-        tabIndex={-1}
-        aria-labelledby="cartModalLabel"
-        aria-hidden="true"
-      >
-        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h1 className="modal-title fs-5" id="cartModalLabel">Cart</h1>
-              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" />
-            </div>
-            <div className="modal-body">Orders</div>
-            <div className="modal-footer">
-              <form action="/cart" method="get">
-                <button type="submit" className="btn btn-primary">
-                  Go to Cart
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
   );
 }

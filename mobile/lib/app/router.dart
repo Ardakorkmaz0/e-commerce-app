@@ -6,6 +6,7 @@ import 'package:ecommerce_mobile/features/auth/presentation/sign_in_screen.dart'
 import 'package:ecommerce_mobile/features/auth/presentation/sign_up_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/splash_screen.dart';
 import 'package:ecommerce_mobile/features/main/presentation/main_screen.dart';
+import 'package:ecommerce_mobile/features/payments/presentation/add_card_screen.dart';
 import 'package:ecommerce_mobile/features/payments/presentation/payment_methods_screen.dart';
 import 'package:ecommerce_mobile/features/products/presentation/product_detail_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_product_form_screen.dart';
@@ -65,6 +66,11 @@ final GoRouter appRouter = GoRouter(
       path: '/profile/payment-methods',
       name: 'paymentMethods',
       builder: (context, state) => const PaymentMethodsScreen(),
+    ),
+    GoRoute(
+      path: '/profile/payment-methods/new',
+      name: 'paymentMethodNew',
+      builder: (context, state) => const AddCardScreen(),
     ),
     // Slug rather than id, matching the backend's lookup_field.
     GoRoute(

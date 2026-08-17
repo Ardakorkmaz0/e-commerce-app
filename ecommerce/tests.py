@@ -9,7 +9,14 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from .management.commands.seed_catalog import DEMO_PRODUCTS
-from .models import Attribute, Category, Product, SellerRating
+from .models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    Product,
+    ProductVariant,
+    SellerRating,
+)
 
 
 User = get_user_model()
@@ -340,3 +347,150 @@ class ProductSellerPayloadTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.json()["seller"])
+
+
+class ProductVariantApiTests(TestCase):
+    """The rules the pickers on web and mobile are built on."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.category = Category.objects.create(name="Consoles")
+
+        self.user = User.objects.create_user(
+            username="shopper",
+            email="shopper@example.com",
+            password="pw-for-tests-only",
+        )
+
+        self.product = Product.objects.create(
+            name="PlayStation 5",
+            description="Base description.",
+            price=Decimal("649.00"),
+            stock=0,
+            category=self.category,
+        )
+
+        colour = Attribute.objects.create(name="Colour", position=1)
+        storage = Attribute.objects.create(name="Storage", position=2)
+
+        self.white = AttributeValue.objects.create(
+            attribute=colour, name="White", swatch_color="#F8FAFC", position=1
+        )
+        self.black = AttributeValue.objects.create(
+            attribute=colour, name="Black", swatch_color="#111827", position=2
+        )
+        self.one_tb = AttributeValue.objects.create(
+            attribute=storage, name="1 TB", position=1
+        )
+        self.two_tb = AttributeValue.objects.create(
+            attribute=storage, name="2 TB", position=2
+        )
+
+        # Deliberately not every combination: White/2 TB was never built.
+        self.white_1tb = ProductVariant.objects.create(
+            product=self.product, price=Decimal("649.00"), stock=0
+        )
+        self.white_1tb.option_values.set([self.white, self.one_tb])
+
+        self.black_2tb = ProductVariant.objects.create(
+            product=self.product,
+            price=Decimal("899.00"),
+            stock=3,
+            description="The roomy one.",
+        )
+        self.black_2tb.option_values.set([self.black, self.two_tb])
+
+    def test_detail_lists_groups_and_variants(self):
+        response = self.client.get(f"/api/v1/products/{self.product.slug}/")
+        data = response.json()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(data["has_variants"])
+        self.assertEqual(
+            [group["name"] for group in data["option_groups"]],
+            ["Colour", "Storage"],
+        )
+        self.assertEqual(
+            data["option_groups"][0]["values"][0]["swatch_color"], "#F8FAFC"
+        )
+
+        # Sorted, so a client can compare its selection position by position.
+        for variant in data["variants"]:
+            self.assertEqual(
+                variant["option_value_ids"], sorted(variant["option_value_ids"])
+            )
+
+    def test_variant_label_orders_by_attribute(self):
+        self.assertEqual(self.black_2tb.option_label, "Black / 2 TB")
+
+    def test_variant_falls_back_to_the_product_price(self):
+        plain = ProductVariant.objects.create(product=self.product, stock=1)
+        self.assertEqual(plain.effective_price, self.product.price)
+
+    def test_adding_without_a_variant_is_rejected(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": self.product.pk, "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_adding_a_sold_out_variant_is_rejected(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/cart/items/",
+            {
+                "product_id": self.product.pk,
+                "variant_id": self.white_1tb.pk,
+                "quantity": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_adding_a_variant_prices_and_labels_the_line(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/cart/items/",
+            {
+                "product_id": self.product.pk,
+                "variant_id": self.black_2tb.pk,
+                "quantity": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        line = response.json()["items"][0]
+        self.assertEqual(line["variant_id"], self.black_2tb.pk)
+        self.assertEqual(line["option_label"], "Black / 2 TB")
+        self.assertEqual(Decimal(line["unit_price"]), Decimal("899.00"))
+        self.assertEqual(Decimal(line["line_total"]), Decimal("1798.00"))
+
+    def test_a_variant_id_on_a_plain_product_is_rejected(self):
+        plain = Product.objects.create(
+            name="Controller",
+            description="No options.",
+            price=Decimal("59.00"),
+            stock=5,
+            category=self.category,
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/cart/items/",
+            {
+                "product_id": plain.pk,
+                "variant_id": self.black_2tb.pk,
+                "quantity": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

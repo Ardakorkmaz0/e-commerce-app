@@ -103,7 +103,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           gradient: RadialGradient(
             center: const Alignment(-0.7, -0.7),
             radius: 1.5,
-            colors: [AppColors.primary.withAlpha(46), Colors.white],
+            colors: [
+              context.accent.withAlpha(46),
+              Theme.of(context).scaffoldBackgroundColor,
+            ],
           ),
         ),
         child: SafeArea(
@@ -115,7 +118,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: const Color(0xF5FFFFFF),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: AppColors.cardBorder),
                     boxShadow: const [
@@ -263,7 +266,7 @@ class _Field extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: context.fieldFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
           borderSide: const BorderSide(color: AppColors.border),

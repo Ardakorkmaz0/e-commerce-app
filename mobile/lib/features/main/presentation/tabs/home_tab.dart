@@ -1,5 +1,6 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
 import 'package:ecommerce_mobile/features/addresses/presentation/widgets/selected_address_button.dart';
+import 'package:ecommerce_mobile/features/cart/presentation/providers/cart_provider.dart';
 import 'package:ecommerce_mobile/features/main/presentation/providers/tab_provider.dart';
 import 'package:ecommerce_mobile/features/products/data/models/product_model.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
@@ -50,6 +51,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     final categories = ref.watch(categoriesProvider);
     final products = ref.watch(productListProvider(query));
     final isSearching = query.search.isNotEmpty;
+    final cartCount = ref.watch(cartCountProvider);
 
     return Scaffold(
       // Mobile equivalent of the web navbar
@@ -69,25 +71,30 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 icon: const Icon(Icons.shopping_cart_outlined),
                 tooltip: 'Cart',
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '0',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+              // Hidden at zero rather than showing a "0" badge.
+              if (cartCount > 0)
+                Positioned(
+                  top: 6,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$cartCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(width: 4),

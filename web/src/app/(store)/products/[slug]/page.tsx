@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AddToCartButton } from "@/components/add-to-cart-button";
 import { ProductCard } from "@/components/product-card";
+import { VariantPicker } from "@/components/variant-picker";
 import { SellerRatingForm } from "@/components/seller-rating-form";
 import { VerifiedSellerBadge } from "@/components/verified-seller-badge";
 import { getCurrentUser } from "@/lib/auth";
@@ -168,29 +170,24 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <hr className="product-detail-divider" />
 
-            <div className="d-flex align-items-center gap-2 mb-3">
-              <label className="form-label mb-0" htmlFor="quantity">
-                Quantity
-              </label>
-              <input
-                id="quantity"
-                type="number"
-                className="form-control product-detail-quantity"
-                defaultValue={1}
-                min={1}
-                max={Math.max(product.stock, 1)}
-                disabled={!product.in_stock}
+            {/* Products with options get the picker; plain ones keep the
+                single button. */}
+            {product.has_variants && product.variants?.length ? (
+              <VariantPicker
+                productId={product.id}
+                groups={product.option_groups ?? []}
+                variants={product.variants}
+                fallbackImage={product.image_url}
+                fallbackDescription={product.description}
               />
-            </div>
-
-            {/* TODO: enable once the cart API exists */}
-            <button
-              className="btn signin-submit-button w-100 py-2"
-              type="button"
-              disabled
-            >
-              {product.in_stock ? "Add to cart (coming soon)" : "Out of stock"}
-            </button>
+            ) : (
+              <AddToCartButton
+                productId={product.id}
+                inStock={product.in_stock}
+                maxQuantity={product.stock}
+                withQuantity
+              />
+            )}
 
             <dl className="product-detail-meta mt-4 mb-0">
               <div>

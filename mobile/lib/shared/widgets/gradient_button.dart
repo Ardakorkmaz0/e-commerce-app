@@ -20,7 +20,7 @@ class GradientButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         // Remove gradient when disabled, apply grey instead
-        gradient: disabled ? null : AppGradients.action,
+        gradient: disabled ? null : AppGradients.of(context),
         color: disabled ? Colors.grey.shade300 : null,
         borderRadius: BorderRadius.circular(8),
         // Web: box-shadow 0 10px 24px rgba(79,70,229,0.28)

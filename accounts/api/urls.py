@@ -6,6 +6,8 @@ from .views import (
     DeliveryAddressDetailView,
     DeliveryAddressListCreateView,
     LogoutView,
+    PaymentMethodDetailView,
+    PaymentMethodListCreateView,
     RegisterView,
 )
 
@@ -26,6 +28,16 @@ urlpatterns = [
         "addresses/<int:address_id>/",
         DeliveryAddressDetailView.as_view(),
         name="address_detail",
+    ),
+    path(
+        "payment-methods/",
+        PaymentMethodListCreateView.as_view(),
+        name="payment_methods",
+    ),
+    path(
+        "payment-methods/<int:method_id>/",
+        PaymentMethodDetailView.as_view(),
+        name="payment_method_detail",
     ),
     path("logout/", LogoutView.as_view(), name="logout"),
 ]

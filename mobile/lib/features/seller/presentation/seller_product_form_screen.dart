@@ -257,23 +257,11 @@ class _SellerProductFormScreenState
   }
 }
 
+/// Fill and borders now come from the app's inputDecorationTheme, which has
+/// a light and a dark variant, so only the label and padding are set here.
 InputDecoration _decoration(String label) {
   return InputDecoration(
     labelText: label,
-    filled: true,
-    fillColor: Colors.white,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppColors.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppColors.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppColors.primary, width: 2),
-    ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   );
 }

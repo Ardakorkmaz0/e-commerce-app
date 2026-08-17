@@ -1,4 +1,5 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/core/theme/theme_provider.dart';
 import 'package:ecommerce_mobile/features/auth/data/models/user_model.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
@@ -50,10 +51,10 @@ class ProfileTab extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.pushNamed('addresses'),
               ),
+              const _AppearanceTile(),
               ListTile(
                 leading: const Icon(Icons.credit_card_outlined),
                 title: const Text('Payment methods'),
-                subtitle: const Text('Coming soon'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.pushNamed('paymentMethods'),
               ),
@@ -131,6 +132,85 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Theme picker.
+///
+/// "System default" is the starting point, so the app follows the phone
+/// unless the shopper deliberately overrides it.
+class _AppearanceTile extends ConsumerWidget {
+  const _AppearanceTile();
+
+  Future<void> _choose(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(themeModeProvider);
+
+    final chosen = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Appearance',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            // RadioGroup owns the selection; the tiles only declare values.
+            // RadioListTile's own groupValue/onChanged are deprecated.
+            RadioGroup<ThemeMode>(
+              groupValue: current,
+              onChanged: (value) => Navigator.of(sheetContext).pop(value),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  for (final mode in ThemeMode.values)
+                    RadioListTile<ThemeMode>(
+                      value: mode,
+                      title: Text(themeModeLabel(mode)),
+                      subtitle: mode == ThemeMode.system
+                          ? const Text('Follow the device setting')
+                          : null,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (chosen != null) {
+      await ref.read(themeModeProvider.notifier).setThemeMode(chosen);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+
+    return ListTile(
+      leading: Icon(
+        switch (mode) {
+          ThemeMode.light => Icons.light_mode_outlined,
+          ThemeMode.dark => Icons.dark_mode_outlined,
+          ThemeMode.system => Icons.brightness_auto_outlined,
+        },
+      ),
+      title: const Text('Appearance'),
+      subtitle: Text(themeModeLabel(mode)),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _choose(context, ref),
     );
   }
 }

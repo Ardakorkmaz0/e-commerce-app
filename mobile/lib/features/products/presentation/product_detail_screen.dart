@@ -1,7 +1,11 @@
 import 'package:ecommerce_mobile/core/theme/app_theme.dart';
+import 'package:ecommerce_mobile/features/cart/data/cart_repository.dart';
+import 'package:ecommerce_mobile/features/cart/presentation/providers/cart_provider.dart';
+import 'package:ecommerce_mobile/features/main/presentation/providers/tab_provider.dart';
 import 'package:ecommerce_mobile/features/products/data/models/product_model.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
 import 'package:ecommerce_mobile/features/products/presentation/seller_rating_bar.dart';
+import 'package:ecommerce_mobile/features/products/presentation/variant_picker.dart';
 import 'package:ecommerce_mobile/shared/widgets/gradient_button.dart';
 import 'package:ecommerce_mobile/shared/widgets/product_card.dart';
 import 'package:flutter/material.dart';
@@ -45,17 +49,50 @@ class ProductDetailScreen extends ConsumerWidget {
   }
 }
 
-class _ProductDetailBody extends ConsumerWidget {
+class _ProductDetailBody extends ConsumerStatefulWidget {
   const _ProductDetailBody({required this.product});
 
   final Product product;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProductDetailBody> createState() => _ProductDetailBodyState();
+}
+
+class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody> {
+  /// Option group slug -> chosen value id. Empty for products without
+  /// options, which keeps every read below falling back to the product.
+  late Map<String, int> _selection;
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = widget.product.variants.isEmpty
+        ? <String, int>{}
+        : initialSelection(widget.product);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+
     // Same category, current product removed — the web's "More in ..." row.
     final related = ref.watch(
       productListProvider(ProductQuery(category: product.categorySlug)),
     );
+
+    // Null while the shopper is on a combination that was never built.
+    final variant = product.hasVariants
+        ? findVariant(product.variants, _selection)
+        : null;
+
+    // Each of these falls back to the product, so a variant that leaves its
+    // image or description blank simply inherits the product's.
+    final image = (variant?.imageUrl.isNotEmpty ?? false)
+        ? variant!.imageUrl
+        : product.imageUrl;
+    final description = (variant?.description.isNotEmpty ?? false)
+        ? variant!.description
+        : product.description;
 
     return ListView(
       children: <Widget>[
@@ -64,14 +101,17 @@ class _ProductDetailBody extends ConsumerWidget {
           height: 280,
           width: double.infinity,
           color: AppColors.primary.withAlpha(20),
-          child: product.imageUrl.isEmpty
+          child: image.isEmpty
               ? Icon(
                   Icons.image_outlined,
                   size: 96,
                   color: AppColors.primary.withAlpha(100),
                 )
               : Image.network(
-                  product.imageUrl,
+                  image,
+                  // Keyed so switching variants swaps the picture instead of
+                  // reusing the previous element's already-decoded image.
+                  key: ValueKey<String>(image),
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => Icon(
                     Icons.image_not_supported_outlined,
@@ -109,22 +149,36 @@ class _ProductDetailBody extends ConsumerWidget {
               Row(
                 children: <Widget>[
                   Text(
-                    product.formattedPrice,
-                    style: const TextStyle(
+                    // No variant chosen yet means no single price to show.
+                    product.hasVariants
+                        ? (variant?.formattedPrice ?? 'Choose an option')
+                        : product.formattedPrice,
+                    style: TextStyle(
                       color: AppColors.primary,
-                      fontSize: 26,
+                      fontSize: variant == null && product.hasVariants ? 18 : 26,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  _StockBadge(product: product),
+                  _StockBadge(product: product, variant: variant),
                 ],
               ),
               const SizedBox(height: 20),
 
-              if (product.description.isNotEmpty) ...<Widget>[
+              if (product.hasVariants) ...<Widget>[
+                VariantOptions(
+                  product: product,
+                  selection: _selection,
+                  onChanged: (groupSlug, valueId) {
+                    setState(() => _selection[groupSlug] = valueId);
+                  },
+                ),
+                const SizedBox(height: 2),
+              ],
+
+              if (description.isNotEmpty) ...<Widget>[
                 Text(
-                  product.description,
+                  description,
                   style: const TextStyle(
                     color: AppColors.mutedText,
                     height: 1.55,
@@ -140,13 +194,7 @@ class _ProductDetailBody extends ConsumerWidget {
 
               const SizedBox(height: 24),
 
-              // TODO: enable once the cart API exists
-              GradientButton(
-                label: product.inStock
-                    ? 'Add to cart (coming soon)'
-                    : 'Out of stock',
-                onPressed: null,
-              ),
+              _AddToCartButton(product: product, variant: variant),
             ],
           ),
         ),
@@ -205,13 +253,37 @@ class _ProductDetailBody extends ConsumerWidget {
 }
 
 class _StockBadge extends StatelessWidget {
-  const _StockBadge({required this.product});
+  const _StockBadge({required this.product, this.variant});
 
   final Product product;
 
+  /// Null either because the product has no options, or because the current
+  /// combination was never built.
+  final ProductVariant? variant;
+
   @override
   Widget build(BuildContext context) {
-    final inStock = product.inStock;
+    if (product.hasVariants && variant == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Text(
+          'Unavailable combination',
+          style: TextStyle(
+            color: Color(0xFFB91C1C),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    final inStock = variant?.inStock ?? product.inStock;
+    final stock = variant?.stock ?? product.stock;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -219,7 +291,7 @@ class _StockBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        inStock ? 'In stock · ${product.stock} left' : 'Out of stock',
+        inStock ? 'In stock · $stock left' : 'Out of stock',
         style: TextStyle(
           color: inStock ? const Color(0xFF047857) : const Color(0xFFB91C1C),
           fontSize: 12,
@@ -303,6 +375,137 @@ class _SellerPanel extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Adds the product, with a quantity stepper for more than one.
+///
+/// Errors come straight from the API, which is the only place that knows
+/// the current stock.
+class _AddToCartButton extends ConsumerStatefulWidget {
+  const _AddToCartButton({required this.product, this.variant});
+
+  final Product product;
+  final ProductVariant? variant;
+
+  @override
+  ConsumerState<_AddToCartButton> createState() => _AddToCartButtonState();
+}
+
+class _AddToCartButtonState extends ConsumerState<_AddToCartButton> {
+  int _quantity = 1;
+  bool _adding = false;
+
+  Future<void> _add() async {
+    setState(() => _adding = true);
+    try {
+      await ref
+          .read(cartProvider.notifier)
+          .add(
+            productId: widget.product.id,
+            quantity: _quantity,
+            variantId: widget.variant?.id,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Added to your cart.'),
+          action: SnackBarAction(
+            label: 'View cart',
+            onPressed: () {
+              ref.read(selectedTabProvider.notifier).state = MainTab.cart;
+              if (context.mounted) context.goNamed('main');
+            },
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(describeCartError(error))));
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  /// Variants carry their own stock, so a quantity that was fine for the
+  /// previous one has to be pulled back down when the shopper switches.
+  @override
+  void didUpdateWidget(_AddToCartButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final max = _maxQuantity;
+    if (_quantity > max) {
+      setState(() => _quantity = max < 1 ? 1 : max);
+    }
+  }
+
+  int get _maxQuantity {
+    final stock = widget.variant?.stock ?? widget.product.stock;
+    return stock < 20 ? stock : 20;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.product.hasVariants && widget.variant == null) {
+      return const GradientButton(
+        label: 'Unavailable combination',
+        onPressed: null,
+      );
+    }
+
+    final inStock = widget.variant?.inStock ?? widget.product.inStock;
+    if (!inStock) {
+      return const GradientButton(label: 'Out of stock', onPressed: null);
+    }
+
+    final maxQuantity = _maxQuantity;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const Text('Quantity', style: TextStyle(color: AppColors.mutedText)),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.remove, size: 18),
+                    onPressed: _quantity > 1
+                        ? () => setState(() => _quantity--)
+                        : null,
+                  ),
+                  Text(
+                    '$_quantity',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add, size: 18),
+                    onPressed: _quantity < maxQuantity
+                        ? () => setState(() => _quantity++)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GradientButton(
+          label: _adding ? 'Adding...' : 'Add to cart',
+          onPressed: _adding ? null : _add,
+        ),
+      ],
     );
   }
 }

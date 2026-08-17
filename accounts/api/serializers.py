@@ -6,7 +6,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from accounts.models import DeliveryAddress
+from accounts.cards import (
+    CardError,
+    tokenise,
+    validate_expiry,
+    validate_security_code,
+)
+from accounts.models import DeliveryAddress, PaymentMethod
 
 
 User = get_user_model()
@@ -204,4 +210,73 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
 
         if errors:
             raise serializers.ValidationError(errors)
+        return attrs
+
+
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    """What the API gives back: never enough to charge or reconstruct a card."""
+
+    brand_display = serializers.CharField(source="get_brand_display", read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PaymentMethod
+        fields = (
+            "id",
+            "brand",
+            "brand_display",
+            "last4",
+            "exp_month",
+            "exp_year",
+            "holder_name",
+            "is_default",
+            "is_expired",
+            "created_at",
+        )
+        read_only_fields = fields
+
+
+class PaymentMethodCreateSerializer(serializers.Serializer):
+    """
+    Accepts a card, keeps almost none of it.
+
+    `card_number` and `security_code` are write-only and never reach the
+    database: validate() turns the number into a brand, the last four
+    digits and a token, then lets it fall out of scope.
+    """
+
+    card_number = serializers.CharField(write_only=True, trim_whitespace=True)
+    security_code = serializers.CharField(write_only=True, trim_whitespace=True)
+    holder_name = serializers.CharField(max_length=120)
+    exp_month = serializers.IntegerField()
+    exp_year = serializers.IntegerField()
+    is_default = serializers.BooleanField(required=False, default=False)
+
+    def validate_holder_name(self, value):
+        name = value.strip()
+        if len(name) < 2:
+            raise serializers.ValidationError("Enter the name printed on the card.")
+        return name
+
+    def validate(self, attrs):
+        try:
+            validate_expiry(attrs["exp_month"], attrs["exp_year"])
+        except CardError as error:
+            raise serializers.ValidationError({"exp_month": [str(error)]}) from error
+
+        try:
+            card = tokenise(attrs["card_number"])
+        except CardError as error:
+            raise serializers.ValidationError({"card_number": [str(error)]}) from error
+
+        try:
+            validate_security_code(attrs["security_code"], card["brand"])
+        except CardError as error:
+            raise serializers.ValidationError({"security_code": [str(error)]}) from error
+
+        # Drop the raw values as soon as they have served their purpose, so
+        # they cannot travel further into the view by accident.
+        attrs.pop("card_number")
+        attrs.pop("security_code")
+        attrs.update(card)
         return attrs

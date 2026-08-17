@@ -231,7 +231,8 @@ class _Field extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.white,
+        // From the theme, so the field is dark in dark mode.
+        fillColor: context.fieldFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.border),

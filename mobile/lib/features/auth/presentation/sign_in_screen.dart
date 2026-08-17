@@ -65,12 +65,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       body: Container(
         // Web: .signin-page → radial gradient background
         decoration: BoxDecoration(
+          // Same wash as the web sign-in page, tinted for whichever theme
+          // is in effect.
           gradient: RadialGradient(
             center: const Alignment(-0.7, -0.7),
             radius: 1.5,
             colors: [
-              AppColors.primary.withAlpha(46),
-              Colors.white,
+              context.accent.withAlpha(46),
+              Theme.of(context).scaffoldBackgroundColor,
             ],
           ),
         ),
@@ -84,7 +86,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   // Web: .form-signin card style
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: const Color(0xF5FFFFFF),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: AppColors.cardBorder),
                     boxShadow: const [
@@ -216,9 +218,9 @@ class _StackedFields extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.borderColor),
         borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
+        color: context.fieldFill,
       ),
       child: Column(
         children: [

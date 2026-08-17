@@ -1,6 +1,14 @@
 from rest_framework import serializers
 
-from ..models import Attribute, AttributeValue, Category, Product
+from ..models import (
+    Attribute,
+    AttributeValue,
+    Cart,
+    CartItem,
+    Category,
+    Product,
+    ProductVariant,
+)
 
 
 class SellerRatingInputSerializer(serializers.Serializer):
@@ -105,6 +113,53 @@ class SellerProductSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ProductVariantSerializer(serializers.ModelSerializer):
+    """
+    One buyable combination.
+
+    `option_value_ids` is what the client matches its selection against:
+    pick one value per group, find the variant whose set equals the picks.
+    """
+
+    option_value_ids = serializers.SerializerMethodField()
+    option_label = serializers.CharField(read_only=True)
+    price = serializers.DecimalField(
+        source="effective_price", max_digits=10, decimal_places=2, read_only=True
+    )
+    description = serializers.CharField(
+        source="effective_description", read_only=True
+    )
+    image_url = serializers.SerializerMethodField()
+    in_stock = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ProductVariant
+        fields = (
+            "id",
+            "sku",
+            "option_value_ids",
+            "option_label",
+            "price",
+            "stock",
+            "in_stock",
+            "description",
+            "image_url",
+        )
+        read_only_fields = fields
+
+    def get_option_value_ids(self, obj):
+        return sorted(value.id for value in obj.option_values.all())
+
+    def get_image_url(self, obj):
+        image = obj.display_image
+        if not image:
+            return ""
+        request = self.context.get("request")
+        if request is not None and image.startswith("/"):
+            return request.build_absolute_uri(image)
+        return image
+
+
 class ProductSerializer(serializers.ModelSerializer):
     # Expose the category by name and slug so the frontend does not need
     # a second request just to show which category a product belongs to.
@@ -115,6 +170,57 @@ class ProductSerializer(serializers.ModelSerializer):
     # or pasted as a link, so the frontend never has to choose between two.
     image_url = serializers.SerializerMethodField()
     seller = serializers.SerializerMethodField()
+
+    has_variants = serializers.BooleanField(read_only=True)
+    variants = ProductVariantSerializer(
+        source="active_variants", many=True, read_only=True
+    )
+    option_groups = serializers.SerializerMethodField()
+    price_from = serializers.SerializerMethodField()
+    price_to = serializers.SerializerMethodField()
+
+    def get_option_groups(self, obj):
+        """
+        The pickers to draw, in attribute order.
+
+        Built from the values the variants actually use, so an option with
+        no variant behind it never appears as a dead choice.
+        """
+        groups = {}
+        for variant in obj.active_variants:
+            for value in variant.option_values.all():
+                attribute = value.attribute
+                group = groups.setdefault(
+                    attribute.id,
+                    {
+                        "name": attribute.name,
+                        "slug": attribute.slug,
+                        "position": attribute.position,
+                        "values": {},
+                    },
+                )
+                group["values"][value.id] = {
+                    "id": value.id,
+                    "name": value.name,
+                    "slug": value.slug,
+                    "swatch_color": value.swatch_color,
+                    "position": value.position,
+                }
+
+        ordered = sorted(groups.values(), key=lambda item: item["position"])
+        for group in ordered:
+            group["values"] = sorted(
+                group["values"].values(),
+                key=lambda item: (item["position"], item["name"]),
+            )
+            group.pop("position")
+        return ordered
+
+    def get_price_from(self, obj):
+        return str(obj.price_range[0])
+
+    def get_price_to(self, obj):
+        return str(obj.price_range[1])
 
     def get_image_url(self, obj):
         image = obj.display_image
@@ -162,4 +268,96 @@ class ProductSerializer(serializers.ModelSerializer):
             "category_slug",
             "image_url",
             "seller",
+            "has_variants",
+            "variants",
+            "option_groups",
+            "price_from",
+            "price_to",
         )
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    """
+    One line in the cart.
+
+    Prices are read from the product on every request, so a price change in
+    the shop shows up in the cart immediately. Stock is reported alongside
+    so the client can show a warning without a second lookup.
+    """
+
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
+    variant_id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(source="product.name", read_only=True)
+    slug = serializers.CharField(source="product.slug", read_only=True)
+    # "White / US 7", empty for products sold without options.
+    option_label = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+    unit_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+    line_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    available_stock = serializers.IntegerField(read_only=True)
+    has_stock_issue = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = CartItem
+        fields = (
+            "id",
+            "product_id",
+            "variant_id",
+            "name",
+            "slug",
+            "option_label",
+            "image_url",
+            "quantity",
+            "unit_price",
+            "line_total",
+            "available_stock",
+            "has_stock_issue",
+        )
+        read_only_fields = fields
+
+    def get_option_label(self, obj):
+        return obj.variant.option_label if obj.variant else ""
+
+    def get_image_url(self, obj):
+        image = obj.image
+        if not image:
+            return ""
+        request = self.context.get("request")
+        if request is not None and image.startswith("/"):
+            return request.build_absolute_uri(image)
+        return image
+
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True, read_only=True)
+    item_count = serializers.IntegerField(read_only=True)
+    subtotal = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    has_stock_issues = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cart
+        fields = ("id", "items", "item_count", "subtotal", "has_stock_issues")
+        read_only_fields = fields
+
+    def get_has_stock_issues(self, obj):
+        # Checkout will need to block on this, so the flag is computed once
+        # here rather than re-derived by each client.
+        return any(item.has_stock_issue for item in obj.items.all())
+
+
+class AddToCartSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    # Required for products that have options; the service rejects the
+    # request when it is missing.
+    variant_id = serializers.IntegerField(required=False, allow_null=True)
+    quantity = serializers.IntegerField(required=False, default=1, min_value=1)
+
+
+class UpdateCartItemSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(min_value=1)

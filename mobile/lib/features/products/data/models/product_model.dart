@@ -49,6 +49,100 @@ class SellerRating {
   }
 }
 
+class OptionValue {
+  const OptionValue({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.swatchColor,
+  });
+
+  final int id;
+  final String name;
+  final String slug;
+
+  /// Hex like "#111827" when the value should render as a dot, else empty.
+  final String swatchColor;
+
+  factory OptionValue.fromJson(Map<String, dynamic> json) {
+    return OptionValue(
+      id: json['id'] as int,
+      name: json['name'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+      swatchColor: json['swatch_color'] as String? ?? '',
+    );
+  }
+}
+
+class OptionGroup {
+  const OptionGroup({
+    required this.name,
+    required this.slug,
+    required this.values,
+  });
+
+  final String name;
+  final String slug;
+  final List<OptionValue> values;
+
+  bool get isColour => values.any((value) => value.swatchColor.isNotEmpty);
+
+  factory OptionGroup.fromJson(Map<String, dynamic> json) {
+    return OptionGroup(
+      name: json['name'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+      values: (json['values'] as List<dynamic>? ?? <dynamic>[])
+          .map((item) => OptionValue.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class ProductVariant {
+  const ProductVariant({
+    required this.id,
+    required this.optionValueIds,
+    required this.optionLabel,
+    required this.price,
+    required this.stock,
+    required this.inStock,
+    required this.description,
+    required this.imageUrl,
+  });
+
+  final int id;
+
+  /// Sorted by the API, so a selection can be compared against it directly.
+  final List<int> optionValueIds;
+
+  final String optionLabel;
+  final String price;
+  final int stock;
+  final bool inStock;
+  final String description;
+  final String imageUrl;
+
+  String get formattedPrice {
+    final amount = double.tryParse(price);
+    return amount == null ? price : '\$${amount.toStringAsFixed(2)}';
+  }
+
+  factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    return ProductVariant(
+      id: json['id'] as int,
+      optionValueIds: (json['option_value_ids'] as List<dynamic>? ?? <dynamic>[])
+          .map((item) => item as int)
+          .toList(),
+      optionLabel: json['option_label'] as String? ?? '',
+      price: json['price']?.toString() ?? '0',
+      stock: json['stock'] as int? ?? 0,
+      inStock: json['in_stock'] as bool? ?? false,
+      description: json['description'] as String? ?? '',
+      imageUrl: json['image_url'] as String? ?? '',
+    );
+  }
+}
+
 class Product {
   const Product({
     required this.id,
@@ -64,6 +158,9 @@ class Product {
     this.categoryId,
     this.isActive = true,
     this.seller,
+    this.hasVariants = false,
+    this.variants = const <ProductVariant>[],
+    this.optionGroups = const <OptionGroup>[],
   });
 
   final int id;
@@ -87,6 +184,11 @@ class Product {
 
   final bool isActive;
   final SellerSummary? seller;
+
+  // Only the detail endpoint fills these in.
+  final bool hasVariants;
+  final List<ProductVariant> variants;
+  final List<OptionGroup> optionGroups;
 
   /// Parses both catalog shapes.
   ///
@@ -122,6 +224,13 @@ class Product {
       seller: seller is Map<String, dynamic>
           ? SellerSummary.fromJson(seller)
           : null,
+      hasVariants: json['has_variants'] as bool? ?? false,
+      variants: (json['variants'] as List<dynamic>? ?? <dynamic>[])
+          .map((item) => ProductVariant.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      optionGroups: (json['option_groups'] as List<dynamic>? ?? <dynamic>[])
+          .map((item) => OptionGroup.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 

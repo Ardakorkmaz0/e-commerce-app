@@ -1,13 +1,45 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Attribute, AttributeValue, Category, Product, SellerRating
+from .models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    Product,
+    ProductVariant,
+    SellerRating,
+)
 
 
 class AttributeValueInline(admin.TabularInline):
     model = AttributeValue
     extra = 3
     prepopulated_fields = {"slug": ("name",)}
+    fields = ("name", "slug", "swatch_color", "position")
+
+
+class ProductVariantInline(admin.TabularInline):
+    """
+    Variants are edited on the product they belong to, which is the only
+    place the combination makes sense.
+    """
+
+    model = ProductVariant
+    extra = 1
+    filter_horizontal = ("option_values",)
+    fields = (
+        "option_values",
+        "price",
+        "stock",
+        "image",
+        "image_url",
+        "description",
+        "is_active",
+        "position",
+    )
+    # Left empty, price falls back to the product's; the help text on the
+    # model field says so.
+    show_change_link = True
 
 
 @admin.register(Attribute)
@@ -63,6 +95,7 @@ class ProductAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("image_preview",)
     filter_horizontal = ("attribute_values",)
+    inlines = [ProductVariantInline]
 
     BASE_FIELDSETS = (
         (None, {"fields": ("name", "slug", "category", "description")}),

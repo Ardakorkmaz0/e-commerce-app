@@ -4,19 +4,31 @@ from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, Max, Min, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import Attribute, Category, Product, SellerRating
+from ..services import (
+    CartError,
+    add_to_cart,
+    clear_cart,
+    get_or_create_cart,
+    remove_cart_item,
+    set_cart_item_quantity,
+)
 from .pagination import ProductPagination
 from .permissions import SELLER_GROUP, IsSeller
 from .serializers import (
+    AddToCartSerializer,
     AttributeSerializer,
+    CartSerializer,
     CategorySerializer,
     ProductSerializer,
     SellerRatingInputSerializer,
     SellerProductSerializer,
+    UpdateCartItemSerializer,
 )
 
 
@@ -166,7 +178,11 @@ class ProductListView(generics.ListAPIView):
         queryset = (
             Product.objects.filter(is_active=True)
             .select_related("category", "seller")
-            .prefetch_related("seller__seller_ratings_received")
+            .prefetch_related(
+                "seller__seller_ratings_received",
+                # Without this the variant pickers cost one query per option.
+                "variants__option_values__attribute",
+            )
         )
 
         category = self.request.query_params.get("category", "").strip()
@@ -201,7 +217,11 @@ class ProductDetailView(generics.RetrieveAPIView):
     queryset = (
         Product.objects.filter(is_active=True)
         .select_related("category", "seller")
-        .prefetch_related("seller__seller_ratings_received")
+        .prefetch_related(
+            "seller__seller_ratings_received",
+            # Without this the variant pickers cost one query per option.
+            "variants__option_values__attribute",
+        )
     )
 
 
@@ -463,4 +483,89 @@ class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         # Filtering here means another seller's slug simply 404s.
         return Product.objects.filter(seller=self.request.user).select_related(
             "category"
+        )
+
+
+# ── Cart ─────────────────────────────────────────────────────────────
+# Quantities and totals are computed on the server. The client sends what
+# it wants, never what it thinks the price is.
+
+
+class CartView(APIView):
+    """GET /api/v1/cart/ — the signed-in shopper's cart."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cart = get_or_create_cart(request.user)
+        return Response(
+            CartSerializer(cart, context={"request": request}).data
+        )
+
+    def delete(self, request):
+        clear_cart(user=request.user)
+        cart = get_or_create_cart(request.user)
+        return Response(
+            CartSerializer(cart, context={"request": request}).data
+        )
+
+
+class CartItemsView(APIView):
+    """POST /api/v1/cart/items/ — add a product, or raise its quantity."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AddToCartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            add_to_cart(
+                user=request.user,
+                product_id=serializer.validated_data["product_id"],
+                variant_id=serializer.validated_data.get("variant_id"),
+                quantity=serializer.validated_data["quantity"],
+            )
+        except CartError as error:
+            raise ValidationError({"detail": [str(error)]}) from error
+
+        cart = get_or_create_cart(request.user)
+        return Response(
+            CartSerializer(cart, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CartItemDetailView(APIView):
+    """PATCH / DELETE /api/v1/cart/items/<id>/"""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, item_id):
+        serializer = UpdateCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            set_cart_item_quantity(
+                user=request.user,
+                item_id=item_id,
+                quantity=serializer.validated_data["quantity"],
+            )
+        except CartError as error:
+            raise ValidationError({"detail": [str(error)]}) from error
+
+        cart = get_or_create_cart(request.user)
+        return Response(
+            CartSerializer(cart, context={"request": request}).data
+        )
+
+    def delete(self, request, item_id):
+        try:
+            remove_cart_item(user=request.user, item_id=item_id)
+        except CartError as error:
+            raise ValidationError({"detail": [str(error)]}) from error
+
+        cart = get_or_create_cart(request.user)
+        return Response(
+            CartSerializer(cart, context={"request": request}).data
         )
