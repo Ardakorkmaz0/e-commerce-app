@@ -51,6 +51,7 @@ export type Product = {
   // Present on the detail endpoint. A product with no variants is sold as
   // itself; with variants, one has to be chosen before adding to the cart.
   has_variants?: boolean;
+  total_stock?: number;
   variants?: ProductVariant[];
   option_groups?: OptionGroup[];
   price_from?: string;

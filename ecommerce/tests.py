@@ -494,3 +494,386 @@ class ProductVariantApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SellerVariantApiTests(TestCase):
+    """The seller panel's variant grid: generate, edit, delete, isolate."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        sellers, _ = Group.objects.get_or_create(name="Sellers")
+        self.seller = User.objects.create_user(
+            username="variant-seller",
+            email="variant-seller@example.com",
+            password="pw-for-tests-only",
+        )
+        self.seller.groups.add(sellers)
+
+        self.other = User.objects.create_user(
+            username="other-seller",
+            email="other-seller@example.com",
+            password="pw-for-tests-only",
+        )
+        self.other.groups.add(sellers)
+
+        self.category = Category.objects.create(name="Shoes")
+
+        self.size = Attribute.objects.create(name="Size", position=1)
+        self.size.categories.add(self.category)
+        self.colour = Attribute.objects.create(name="Colour", position=2)
+        self.colour.categories.add(self.category)
+
+        self.s40 = AttributeValue.objects.create(
+            attribute=self.size, name="40", position=1
+        )
+        self.s41 = AttributeValue.objects.create(
+            attribute=self.size, name="41", position=2
+        )
+        self.red = AttributeValue.objects.create(
+            attribute=self.colour, name="Red", swatch_color="#DC2626", position=1
+        )
+        self.blue = AttributeValue.objects.create(
+            attribute=self.colour, name="Blue", swatch_color="#2563EB", position=2
+        )
+
+        # An attribute that belongs to a different category entirely.
+        other_category = Category.objects.create(name="Laptops")
+        ram = Attribute.objects.create(name="RAM", position=3)
+        ram.categories.add(other_category)
+        self.ram16 = AttributeValue.objects.create(attribute=ram, name="16 GB")
+
+        self.product = Product.objects.create(
+            name="Runner",
+            description="A shoe.",
+            price=Decimal("80.00"),
+            stock=0,
+            category=self.category,
+            seller=self.seller,
+        )
+
+    def url(self, suffix=""):
+        return f"/api/v1/seller/products/{self.product.slug}/variants/{suffix}"
+
+    def test_generate_builds_every_combination(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url("generate/"),
+            {"value_ids": [self.s40.pk, self.s41.pk, self.red.pk, self.blue.pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["created"], 4)
+        self.assertEqual(self.product.variants.count(), 4)
+        self.assertEqual(
+            sorted(v.option_label for v in self.product.variants.all()),
+            ["40 / Blue", "40 / Red", "41 / Blue", "41 / Red"],
+        )
+
+    def test_generate_again_only_adds_what_is_missing(self):
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            self.url("generate/"),
+            {"value_ids": [self.s40.pk, self.red.pk]},
+            format="json",
+        )
+
+        # Same call plus one more size: only the new row should appear.
+        response = self.client.post(
+            self.url("generate/"),
+            {"value_ids": [self.s40.pk, self.s41.pk, self.red.pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.json()["created"], 1)
+        self.assertEqual(response.json()["skipped"], 1)
+        self.assertEqual(self.product.variants.count(), 2)
+
+    def test_generate_rejects_values_from_another_category(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url("generate/"),
+            {"value_ids": [self.s40.pk, self.ram16.pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.product.variants.count(), 0)
+
+    def test_creating_one_by_hand_stores_price_stock_and_picture(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url(),
+            {
+                "option_values": [self.s40.pk, self.red.pk],
+                "price": "95.00",
+                "stock": 4,
+                "description": "Runs small.",
+                "image_url": "https://example.com/red-40.png",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["option_label"], "40 / Red")
+        self.assertEqual(body["stock"], 4)
+        self.assertEqual(body["image_display"], "https://example.com/red-40.png")
+
+    def test_two_values_of_one_attribute_are_rejected(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url(),
+            {"option_values": [self.red.pk, self.blue.pk], "stock": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_duplicate_combination_is_rejected(self):
+        self.client.force_authenticate(self.seller)
+        payload = {"option_values": [self.s40.pk, self.red.pk], "stock": 1}
+        self.client.post(self.url(), payload, format="json")
+
+        response = self.client.post(self.url(), payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already exists", str(response.json()))
+
+    def test_editing_a_variant_keeps_its_own_combination_valid(self):
+        self.client.force_authenticate(self.seller)
+        created = self.client.post(
+            self.url(),
+            {"option_values": [self.s40.pk, self.red.pk], "stock": 1},
+            format="json",
+        ).json()
+
+        # Re-sending the same options while changing the stock must not
+        # trip the duplicate check on the row being edited.
+        response = self.client.patch(
+            self.url(str(created["id"]) + "/"),
+            {"option_values": [self.s40.pk, self.red.pk], "stock": 9},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["stock"], 9)
+
+    def test_deleting_a_variant_removes_it(self):
+        self.client.force_authenticate(self.seller)
+        created = self.client.post(
+            self.url(),
+            {"option_values": [self.s40.pk, self.red.pk], "stock": 1},
+            format="json",
+        ).json()
+
+        response = self.client.delete(self.url(str(created["id"]) + "/"))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.product.variants.count(), 0)
+
+    def test_another_seller_cannot_see_or_touch_these_variants(self):
+        self.client.force_authenticate(self.seller)
+        created = self.client.post(
+            self.url(),
+            {"option_values": [self.s40.pk, self.red.pk], "stock": 1},
+            format="json",
+        ).json()
+        detail = self.url(str(created["id"]) + "/")
+
+        self.client.force_authenticate(self.other)
+
+        self.assertEqual(self.client.get(self.url()).status_code, 404)
+        self.assertEqual(
+            self.client.patch(detail, {"stock": 99}, format="json").status_code, 404
+        )
+        self.assertEqual(self.client.delete(detail).status_code, 404)
+
+    def test_a_shopper_without_a_seller_account_is_refused(self):
+        shopper = User.objects.create_user(
+            username="plain-shopper",
+            email="plain-shopper@example.com",
+            password="pw-for-tests-only",
+        )
+        self.client.force_authenticate(shopper)
+
+        self.assertEqual(self.client.get(self.url()).status_code, 403)
+
+    def test_generated_variants_reach_the_public_product(self):
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            self.url("generate/"),
+            {"value_ids": [self.s40.pk, self.red.pk, self.blue.pk]},
+            format="json",
+        )
+        # A variant with no stock is still a real option; give one some.
+        variant = self.product.variants.first()
+        variant.stock = 2
+        variant.save()
+
+        self.client.force_authenticate(None)
+        data = self.client.get(f"/api/v1/products/{self.product.slug}/").json()
+
+        self.assertTrue(data["has_variants"])
+        self.assertEqual(len(data["variants"]), 2)
+        self.assertEqual(
+            [group["name"] for group in data["option_groups"]], ["Size", "Colour"]
+        )
+
+
+class SellerOptionApiTests(TestCase):
+    """The "+" buttons: a seller typing their own options."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        sellers, _ = Group.objects.get_or_create(name="Sellers")
+        self.seller = User.objects.create_user(
+            username="option-seller",
+            email="option-seller@example.com",
+            password="pw-for-tests-only",
+        )
+        self.seller.groups.add(sellers)
+
+        self.category = Category.objects.create(name="Sneakers")
+        self.colour = Attribute.objects.create(name="Sneaker Colour", position=1)
+        self.colour.categories.add(self.category)
+        self.red = AttributeValue.objects.create(
+            attribute=self.colour, name="Red", swatch_color="#DC2626"
+        )
+
+        self.product = Product.objects.create(
+            name="Trainer",
+            description="A shoe.",
+            price=Decimal("70.00"),
+            stock=0,
+            category=self.category,
+            seller=self.seller,
+        )
+        self.url = f"/api/v1/seller/products/{self.product.slug}/options/"
+
+    def test_adds_a_value_to_an_existing_group(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {
+                "attribute_id": self.colour.pk,
+                "name": "Forest Green",
+                "swatch_color": "#166534",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertTrue(body["created"])
+        self.assertEqual(body["value"]["name"], "Forest Green")
+        self.assertEqual(body["value"]["swatch_color"], "#166534")
+        self.assertEqual(self.colour.values.count(), 2)
+
+    def test_starts_a_new_group_and_attaches_it_to_the_category(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {"attribute_name": "Width", "name": "Wide"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        width = Attribute.objects.get(name="Width")
+        self.assertIn(self.category, width.categories.all())
+        self.assertEqual([v.name for v in width.values.all()], ["Wide"])
+
+    def test_an_existing_group_name_is_reused_not_duplicated(self):
+        # Attribute names are unique shop-wide, so typing one that exists
+        # must attach it here rather than blow up.
+        other = Category.objects.create(name="Boots")
+        shared = Attribute.objects.create(name="Width", position=9)
+        shared.categories.add(other)
+
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            self.url,
+            {"attribute_name": "width", "name": "Narrow"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Attribute.objects.filter(name__iexact="width").count(), 1)
+        shared.refresh_from_db()
+        self.assertIn(self.category, shared.categories.all())
+
+    def test_a_value_that_already_exists_is_returned_not_duplicated(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {"attribute_id": self.colour.pk, "name": "red"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.json()["created"])
+        self.assertEqual(response.json()["value"]["id"], self.red.pk)
+        self.assertEqual(self.colour.values.count(), 1)
+
+    def test_a_bad_colour_is_rejected(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {"attribute_id": self.colour.pk, "name": "Teal", "swatch_color": "teal"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_blank_name_is_rejected(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {"attribute_id": self.colour.pk, "name": "   "},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_group_from_another_category_is_rejected(self):
+        elsewhere = Category.objects.create(name="Laptops")
+        ram = Attribute.objects.create(name="Trainer RAM", position=5)
+        ram.categories.add(elsewhere)
+
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            self.url,
+            {"attribute_id": ram.pk, "name": "32 GB"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_another_seller_cannot_add_options_through_this_product(self):
+        sellers = Group.objects.get(name="Sellers")
+        intruder = User.objects.create_user(
+            username="option-intruder",
+            email="option-intruder@example.com",
+            password="pw-for-tests-only",
+        )
+        intruder.groups.add(sellers)
+
+        self.client.force_authenticate(intruder)
+        response = self.client.post(
+            self.url,
+            {"attribute_id": self.colour.pk, "name": "Gold"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)

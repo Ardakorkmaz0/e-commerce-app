@@ -3,10 +3,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth";
 import { fetchAttributes, fetchCategories } from "@/lib/products";
-import { fetchSellerProduct } from "@/lib/seller";
+import { fetchSellerProduct, fetchSellerVariants } from "@/lib/seller";
 
 import { updateProduct } from "../../actions";
 import { ProductForm } from "../../product-form";
+import { VariantSection } from "../variants/variant-section";
 
 export const metadata: Metadata = {
   title: "Edit Product",
@@ -27,10 +28,11 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
   const { slug } = await params;
 
-  const [product, categories, attributes] = await Promise.all([
+  const [product, categories, attributes, variants] = await Promise.all([
     fetchSellerProduct(slug),
     fetchCategories(),
     fetchAttributes(),
+    fetchSellerVariants(slug),
   ]);
 
   // The API only returns the seller's own products, so a missing result
@@ -44,7 +46,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
   const updateWithSlug = updateProduct.bind(null, product.slug);
 
   return (
-    <main className="container py-4" style={{ maxWidth: "720px" }}>
+    <main className="container py-4" style={{ maxWidth: "860px" }}>
       <h1 className="section-title mb-3">Edit Product</h1>
       <div className="profile-card p-4">
         <ProductForm
@@ -64,6 +66,17 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
           }}
         />
       </div>
+
+      <VariantSection
+        slug={product.slug}
+        productName={product.name}
+        productPrice={product.price}
+        productStock={product.stock}
+        attributes={attributes.filter((attribute) =>
+          attribute.categories.includes(product.category),
+        )}
+        variants={variants}
+      />
     </main>
   );
 }

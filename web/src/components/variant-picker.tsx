@@ -1,68 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useActionState } from "react";
 
 import { addToCart, type CartActionState } from "@/app/(store)/cart/actions";
-import type { OptionGroup, ProductVariant } from "@/lib/catalog";
-import { formatPrice } from "@/lib/catalog";
-import { useActionState } from "react";
+
+import { QuantityStepper } from "./quantity-stepper";
+
+import { findVariant, useVariantSelection } from "./variant-selection";
 
 type VariantPickerProps = {
   productId: number;
-  groups: OptionGroup[];
-  variants: ProductVariant[];
-  fallbackImage: string;
   fallbackDescription: string;
 };
 
 const initialState: CartActionState = { message: "", success: false };
 
-/** A selection matches a variant when the two sets of value ids are equal. */
-function findVariant(
-  variants: ProductVariant[],
-  selection: Record<string, number>,
-): ProductVariant | null {
-  const chosen = Object.values(selection).sort((a, b) => a - b);
-  return (
-    variants.find(
-      (variant) =>
-        variant.option_value_ids.length === chosen.length &&
-        variant.option_value_ids.every((id, index) => id === chosen[index]),
-    ) ?? null
-  );
-}
-
 export function VariantPicker({
   productId,
-  groups,
-  variants,
-  fallbackImage,
   fallbackDescription,
 }: VariantPickerProps) {
   const [state, formAction, pending] = useActionState(addToCart, initialState);
-
-  // Start on the first combination that can actually be bought, so the page
-  // opens showing a real price rather than an empty picker.
-  const [selection, setSelection] = useState<Record<string, number>>(() => {
-    const first = variants.find((variant) => variant.in_stock) ?? variants[0];
-    if (!first) return {};
-
-    const initial: Record<string, number> = {};
-    for (const group of groups) {
-      const match = group.values.find((value) =>
-        first.option_value_ids.includes(value.id),
-      );
-      if (match) initial[group.slug] = match.id;
-    }
-    return initial;
-  });
+  const { groups, variants, selection, choose, variant } =
+    useVariantSelection();
 
   const [quantity, setQuantity] = useState(1);
-
-  const variant = useMemo(
-    () => findVariant(variants, selection),
-    [variants, selection],
-  );
 
   /**
    * Whether picking this value still leads to a variant that exists.
@@ -76,23 +38,11 @@ export function VariantPicker({
     return match !== null && match.in_stock;
   }
 
-  const image = variant?.image_url || fallbackImage;
   const description = variant?.description || fallbackDescription;
   const maxQuantity = Math.min(variant?.stock ?? 1, 20);
 
   return (
     <div className="variant-picker">
-      {image ? (
-        <div className="variant-preview">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" />
-        </div>
-      ) : null}
-
-      <div className="variant-price">
-        {variant ? formatPrice(variant.price) : "Choose an option"}
-      </div>
-
       {groups.map((group) => {
         const isColour = group.values.some((value) => value.swatch_color);
 
@@ -125,12 +75,7 @@ export function VariantPicker({
                     // can pivot to them; the button reports the state instead.
                     aria-pressed={selected}
                     title={available ? value.name : `${value.name} — unavailable`}
-                    onClick={() =>
-                      setSelection((current) => ({
-                        ...current,
-                        [group.slug]: value.id,
-                      }))
-                    }
+                    onClick={() => choose(group.slug, value.id)}
                   >
                     {isColour ? (
                       <span className="visually-hidden">{value.name}</span>
@@ -156,24 +101,15 @@ export function VariantPicker({
         <input type="hidden" name="product_id" value={productId} />
         <input type="hidden" name="variant_id" value={variant?.id ?? ""} />
 
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <label className="form-label mb-0" htmlFor="quantity">
-            Quantity
-          </label>
-          <input
-            id="quantity"
+        <div className="d-flex align-items-center gap-3 mb-3">
+          <span className="quantity-label">Quantity</span>
+          <QuantityStepper
             name="quantity"
-            type="number"
-            className="form-control product-detail-quantity"
-            min={1}
-            max={Math.max(maxQuantity, 1)}
             value={quantity}
-            onChange={(event) => setQuantity(Number(event.target.value) || 1)}
+            onChange={setQuantity}
+            max={Math.max(maxQuantity, 1)}
             disabled={!variant?.in_stock}
           />
-          {variant?.in_stock ? (
-            <span className="variant-stock">{variant.stock} in stock</span>
-          ) : null}
         </div>
 
         <button

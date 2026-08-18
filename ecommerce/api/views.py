@@ -1,15 +1,24 @@
 from decimal import Decimal, InvalidOperation
+from itertools import product as cartesian_product
 
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, Max, Min, Q
 from django.shortcuts import get_object_or_404
+from django.utils.text import slugify
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Attribute, Category, Product, SellerRating
+from ..models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    Product,
+    ProductVariant,
+    SellerRating,
+)
 from ..services import (
     CartError,
     add_to_cart,
@@ -19,7 +28,7 @@ from ..services import (
     set_cart_item_quantity,
 )
 from .pagination import ProductPagination
-from .permissions import SELLER_GROUP, IsSeller
+from .permissions import SELLER_GROUP, IsSeller, IsVariantOwner
 from .serializers import (
     AddToCartSerializer,
     AttributeSerializer,
@@ -27,7 +36,10 @@ from .serializers import (
     CategorySerializer,
     ProductSerializer,
     SellerRatingInputSerializer,
+    SellerOptionSerializer,
     SellerProductSerializer,
+    SellerVariantSerializer,
+    VariantGenerateSerializer,
     UpdateCartItemSerializer,
 )
 
@@ -483,6 +495,204 @@ class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         # Filtering here means another seller's slug simply 404s.
         return Product.objects.filter(seller=self.request.user).select_related(
             "category"
+        )
+
+
+class SellerVariantMixin:
+    """Resolves the product from the URL and proves the seller owns it."""
+
+    permission_classes = [IsVariantOwner]
+    serializer_class = SellerVariantSerializer
+
+    def get_product(self):
+        # Filtering by owner means another seller's slug simply 404s.
+        return get_object_or_404(
+            Product.objects.select_related("category"),
+            slug=self.kwargs["slug"],
+            seller=self.request.user,
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # The serializer validates options against the product's category,
+        # so it needs the product the URL points at.
+        context["product"] = self.get_product()
+        return context
+
+    def get_queryset(self):
+        return (
+            ProductVariant.objects.filter(product=self.get_product())
+            .prefetch_related("option_values__attribute")
+            .order_by("position", "id")
+        )
+
+
+class SellerVariantListCreateView(SellerVariantMixin, generics.ListCreateAPIView):
+    """
+    GET  /api/v1/seller/products/<slug>/variants/
+    POST /api/v1/seller/products/<slug>/variants/
+    """
+
+    def perform_create(self, serializer):
+        serializer.save(product=self.get_product())
+
+
+class SellerVariantDetailView(
+    SellerVariantMixin, generics.RetrieveUpdateDestroyAPIView
+):
+    """GET / PATCH / DELETE /api/v1/seller/products/<slug>/variants/<id>/"""
+
+
+class SellerVariantGenerateView(SellerVariantMixin, APIView):
+    """
+    POST /api/v1/seller/products/<slug>/variants/generate/
+
+    Takes the values the seller ticked and creates every combination that
+    does not exist yet, so nobody has to enter "White / 1 TB", "White /
+    2 TB", "Black / 1 TB"… by hand. Existing rows are left alone, which
+    makes the call safe to repeat after adding one more colour.
+    """
+
+    def post(self, request, slug):
+        product = self.get_product()
+
+        serializer = VariantGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data["value_ids"]
+
+        if not values:
+            raise ValidationError({"value_ids": ["Pick at least one option."]})
+
+        allowed = set(
+            Attribute.objects.filter(categories=product.category).values_list(
+                "id", flat=True
+            )
+        )
+        stray = [value.name for value in values if value.attribute_id not in allowed]
+        if stray:
+            raise ValidationError(
+                {
+                    "value_ids": [
+                        f"These do not apply to {product.category.name}: "
+                        + ", ".join(stray)
+                    ]
+                }
+            )
+
+        # One bucket per attribute, ordered so the generated rows read in
+        # the same order as the filter panel.
+        buckets = {}
+        for value in sorted(
+            values,
+            key=lambda v: (v.attribute.position, v.attribute.name, v.position, v.name),
+        ):
+            buckets.setdefault(value.attribute_id, []).append(value)
+
+        combinations = list(cartesian_product(*buckets.values()))
+        if len(combinations) > 100:
+            raise ValidationError(
+                {
+                    "value_ids": [
+                        f"That would create {len(combinations)} variants. "
+                        "Keep it under 100."
+                    ]
+                }
+            )
+
+        existing = {
+            frozenset(variant.option_values.values_list("pk", flat=True))
+            for variant in product.variants.prefetch_related("option_values")
+        }
+
+        position = product.variants.count()
+        created = []
+        for combination in combinations:
+            key = frozenset(value.pk for value in combination)
+            if key in existing:
+                continue
+
+            variant = ProductVariant.objects.create(product=product, position=position)
+            variant.option_values.set(combination)
+            created.append(variant)
+            position += 1
+
+        return Response(
+            {
+                "created": len(created),
+                "skipped": len(combinations) - len(created),
+                "variants": SellerVariantSerializer(
+                    self.get_queryset(), many=True, context={"request": request}
+                ).data,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class SellerOptionCreateView(SellerVariantMixin, APIView):
+    """
+    POST /api/v1/seller/products/<slug>/options/
+
+    Adds one option value, creating its group first when the seller typed a
+    new one. Attributes and their values are shared taxonomy — the same
+    "Colour: Red" filters the whole catalog — so a name that already exists
+    is reused rather than duplicated.
+    """
+
+    def post(self, request, slug):
+        product = self.get_product()
+
+        serializer = SellerOptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        attribute_id = data.get("attribute_id")
+        if attribute_id:
+            attribute = Attribute.objects.filter(
+                pk=attribute_id, categories=product.category
+            ).first()
+            if attribute is None:
+                raise ValidationError(
+                    {"attribute_id": ["That option group is not on this category."]}
+                )
+        else:
+            name = data["attribute_name"].strip()
+            # Attribute names are unique across the shop, so reuse the row
+            # and just attach it to this category.
+            attribute, _ = Attribute.objects.get_or_create(
+                name__iexact=name,
+                defaults={"name": name, "position": Attribute.objects.count() + 1},
+            )
+            attribute.categories.add(product.category)
+
+        slug_value = slugify(data["name"])
+        value = attribute.values.filter(slug=slug_value).first()
+        created = value is None
+
+        if created:
+            value = AttributeValue.objects.create(
+                attribute=attribute,
+                name=data["name"],
+                swatch_color=data.get("swatch_color", ""),
+                position=attribute.values.count() + 1,
+            )
+        elif data.get("swatch_color") and not value.swatch_color:
+            # Filling in a colour that was missing is an improvement, not a
+            # rename, so it is safe to apply to the shared row.
+            value.swatch_color = data["swatch_color"]
+            value.save(update_fields=["swatch_color"])
+
+        return Response(
+            {
+                "created": created,
+                "attribute": {"id": attribute.pk, "name": attribute.name},
+                "value": {
+                    "id": value.pk,
+                    "name": value.name,
+                    "slug": value.slug,
+                    "swatch_color": value.swatch_color,
+                },
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 

@@ -868,17 +868,6 @@ body {
   opacity: 1;
 }
 
-.product-detail-quantity {
-  width: 92px;
-  color: var(--site-text);
-  background: var(--site-input-bg);
-  border-color: var(--site-border);
-}
-
-.product-detail-quantity:focus {
-  border-color: var(--site-focus);
-  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
-}
 
 .product-detail-meta {
   display: grid;
@@ -1641,14 +1630,6 @@ body {
   gap: 0.35rem;
 }
 
-.cart-qty input {
-  width: 64px;
-  padding: 0.25rem 0.5rem;
-  color: var(--site-text);
-  background: var(--site-input-bg);
-  border: 1px solid var(--site-border);
-  border-radius: 8px;
-}
 
 .cart-line-total {
   color: var(--site-text);
@@ -2837,4 +2818,294 @@ body {
     justify-content: flex-start;
     text-align: left;
   }
+}
+
+/* ── Seller variant grid ────────────────────────────────────────────── */
+
+.variant-swatch-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--site-border);
+  border-radius: 50%;
+}
+
+.variant-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.variant-line-item {
+  position: relative;
+  padding: 0.85rem 1rem;
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 12px;
+}
+
+/* The line itself: picture, label, the two numbers, visibility, save. */
+.variant-line-main {
+  display: grid;
+  grid-template-columns: 48px minmax(140px, 1fr) 7rem 6rem auto auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.variant-line-media img,
+.variant-line-placeholder {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background: var(--site-control-bg);
+  border-radius: 8px;
+}
+
+.variant-line-label {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0.35rem;
+  min-width: 0;
+}
+
+.variant-line-label strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variant-row-sku {
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-family: var(--bs-font-monospace, monospace);
+}
+
+.variant-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.variant-field > span {
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.variant-field-full {
+  grid-column: 1 / -1;
+}
+
+.variant-line-visible {
+  padding-bottom: 0.5rem;
+  white-space: nowrap;
+}
+
+.variant-line-more > summary {
+  margin-top: 0.6rem;
+  color: var(--site-muted-text);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.variant-line-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+/* Sits in the row's corner so it cannot be hit while aiming for Save. */
+.variant-line-delete {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+}
+
+.variant-line-delete .btn {
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 991.98px) {
+  /* Below a laptop the six columns stop fitting, so the line wraps into
+     picture + label on one row and the fields underneath. */
+  .variant-line-main {
+    grid-template-columns: 48px 1fr 1fr;
+  }
+
+  .variant-line-label {
+    grid-column: 2 / -1;
+  }
+
+  .variant-line-visible,
+  .variant-line-main > button {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .variant-line-main {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .variant-line-main > button {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Seller option picker ───────────────────────────────────────────── */
+/* Reuses the storefront's .variant-chip / .variant-swatch so the seller
+   sees the same control the shopper will. */
+
+.variant-chip.add,
+.variant-swatch.add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--site-accent);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--site-accent);
+  font-weight: 700;
+}
+
+.variant-swatch.add {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.option-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  background: var(--site-control-bg);
+  border-radius: 10px;
+}
+
+.option-add input[type="text"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.option-add .form-control-color {
+  width: 3rem;
+  padding: 0.25rem;
+}
+
+/* The new-group box stacks: its name, then the nested first-value row. */
+.option-add-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.option-add-group .option-add {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* ── Quantity stepper ───────────────────────────────────────────────── */
+
+.quantity-label {
+  color: var(--site-muted-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.quantity-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-border);
+  border-radius: 999px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* One ring around the whole pill rather than around the middle box, so
+   keyboard focus reads as "this control" and not "this text field". */
+.quantity-stepper:focus-within {
+  border-color: var(--site-focus);
+  box-shadow: 0 0 0 0.2rem var(--site-focus-ring);
+}
+
+.quantity-stepper.disabled {
+  opacity: 0.55;
+}
+
+.quantity-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+  color: var(--site-accent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.quantity-step:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--site-accent);
+}
+
+.quantity-step:disabled {
+  color: var(--site-muted-text);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.quantity-value {
+  width: 3rem;
+  padding: 0.5rem 0;
+  color: var(--site-text);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--site-border);
+  border-right: 1px solid var(--site-border);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.quantity-value:focus {
+  outline: none;
+}
+
+/* The pill's own buttons replace them, and Chrome's arrows would sit on
+   top of the text at this width. */
+.quantity-value::-webkit-outer-spin-button,
+.quantity-value::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.quantity-stepper.small .quantity-step {
+  width: 32px;
+}
+
+.quantity-stepper.small .quantity-value {
+  width: 2.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.9rem;
+}
+
+.cart-qty-saving {
+  color: var(--site-muted-text);
+  font-size: 0.75rem;
 }

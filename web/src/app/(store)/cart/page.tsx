@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CartQuantity } from "@/components/cart-quantity";
 import { fetchCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/products";
 
-import { clearCart, removeCartItem, updateCartItem } from "./actions";
+import { clearCart, removeCartItem } from "./actions";
 
 export const metadata: Metadata = {
   title: "Cart",
@@ -89,25 +90,11 @@ export default async function CartPage() {
                   ) : null}
 
                   <div className="cart-line-controls">
-                    {/* A GET-less form per row keeps this server rendered:
-                        no client state is needed to change a quantity. */}
-                    <form action={updateCartItem} className="cart-qty">
-                      <input type="hidden" name="item_id" value={item.id} />
-                      <label className="visually-hidden" htmlFor={`qty-${item.id}`}>
-                        Quantity
-                      </label>
-                      <input
-                        id={`qty-${item.id}`}
-                        name="quantity"
-                        type="number"
-                        min={1}
-                        max={Math.min(item.available_stock || 1, 20)}
-                        defaultValue={item.quantity}
-                      />
-                      <button className="btn btn-sm btn-outline-secondary" type="submit">
-                        Update
-                      </button>
-                    </form>
+                    <CartQuantity
+                      itemId={item.id}
+                      quantity={item.quantity}
+                      max={Math.min(item.available_stock || 1, 20)}
+                    />
 
                     <form action={removeCartItem}>
                       <input type="hidden" name="item_id" value={item.id} />

@@ -188,6 +188,14 @@ class _SellerProductRow extends ConsumerWidget {
               ),
             ),
             IconButton(
+              tooltip: 'Variants',
+              icon: const Icon(Icons.tune),
+              onPressed: () => context.pushNamed(
+                'sellerProductVariants',
+                pathParameters: {'slug': product.slug},
+              ),
+            ),
+            IconButton(
               tooltip: 'Delete',
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () => _confirmDelete(context, ref),

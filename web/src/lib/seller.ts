@@ -43,3 +43,32 @@ export async function fetchSellerProduct(
     return null;
   }
 }
+
+export type SellerVariant = {
+  id: number;
+  sku: string;
+  option_values: number[];
+  option_label: string;
+  /** null means "same as the product price". */
+  price: string | null;
+  stock: number;
+  description: string;
+  image_url: string;
+  image_display: string;
+  is_active: boolean;
+  position: number;
+};
+
+export async function fetchSellerVariants(
+  slug: string,
+): Promise<SellerVariant[]> {
+  try {
+    const response = await authorizedFetch(`/seller/products/${slug}/variants/`);
+    if (!response?.ok) {
+      return [];
+    }
+    return (await response.json()) as SellerVariant[];
+  } catch {
+    return [];
+  }
+}

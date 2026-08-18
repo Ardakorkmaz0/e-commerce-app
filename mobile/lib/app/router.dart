@@ -11,6 +11,7 @@ import 'package:ecommerce_mobile/features/payments/presentation/payment_methods_
 import 'package:ecommerce_mobile/features/products/presentation/product_detail_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_product_form_screen.dart';
 import 'package:ecommerce_mobile/features/seller/presentation/seller_products_screen.dart';
+import 'package:ecommerce_mobile/features/seller/presentation/seller_variants_screen.dart';
 import 'package:go_router/go_router.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -97,6 +98,12 @@ final GoRouter appRouter = GoRouter(
       name: 'sellerProductEdit',
       builder: (context, state) =>
           SellerProductFormScreen(slug: state.pathParameters['slug']),
+    ),
+    GoRoute(
+      path: '/seller/:slug/variants',
+      name: 'sellerProductVariants',
+      builder: (context, state) =>
+          SellerVariantsScreen(slug: state.pathParameters['slug']!),
     ),
   ],
 );

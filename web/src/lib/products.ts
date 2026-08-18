@@ -55,7 +55,7 @@ export type AttributeOption = {
   name: string;
   slug: string;
   categories: number[];
-  values: { id: number; name: string; slug: string }[];
+  values: { id: number; name: string; slug: string; swatch_color: string }[];
 };
 
 /** Every attribute with its values — used by the seller form. */

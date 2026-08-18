@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { addToCart, type CartActionState } from "@/app/(store)/cart/actions";
+
+import { QuantityStepper } from "./quantity-stepper";
 
 const initialState: CartActionState = { message: "", success: false };
 
@@ -25,6 +27,7 @@ export function AddToCartButton({
   className = "btn signin-submit-button w-100 py-2",
 }: AddToCartButtonProps) {
   const [state, formAction, pending] = useActionState(addToCart, initialState);
+  const [quantity, setQuantity] = useState(1);
 
   if (!inStock) {
     return (
@@ -39,18 +42,13 @@ export function AddToCartButton({
       <input type="hidden" name="product_id" value={productId} />
 
       {withQuantity ? (
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <label className="form-label mb-0" htmlFor="quantity">
-            Quantity
-          </label>
-          <input
-            id="quantity"
+        <div className="d-flex align-items-center gap-3 mb-3">
+          <span className="quantity-label">Quantity</span>
+          <QuantityStepper
             name="quantity"
-            type="number"
-            className="form-control product-detail-quantity"
-            defaultValue={1}
-            min={1}
-            max={Math.min(maxQuantity, 20)}
+            value={quantity}
+            onChange={setQuantity}
+            max={Math.max(Math.min(maxQuantity, 20), 1)}
           />
         </div>
       ) : (

@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 
 from ..models import (
@@ -24,7 +26,9 @@ class CategorySerializer(serializers.ModelSerializer):
 class AttributeValueSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttributeValue
-        fields = ("id", "name", "slug")
+        # swatch_color travels with the value so both the shopper's picker
+        # and the seller's grid can draw a colour as a dot.
+        fields = ("id", "name", "slug", "swatch_color")
 
 
 class AttributeSerializer(serializers.ModelSerializer):
@@ -172,6 +176,9 @@ class ProductSerializer(serializers.ModelSerializer):
     seller = serializers.SerializerMethodField()
 
     has_variants = serializers.BooleanField(read_only=True)
+    # The product's own stock column stays 0 once variants carry it, so the
+    # badge needs the total rather than the column.
+    total_stock = serializers.IntegerField(read_only=True)
     variants = ProductVariantSerializer(
         source="active_variants", many=True, read_only=True
     )
@@ -269,6 +276,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "image_url",
             "seller",
             "has_variants",
+            "total_stock",
             "variants",
             "option_groups",
             "price_from",
@@ -361,3 +369,160 @@ class AddToCartSerializer(serializers.Serializer):
 
 class UpdateCartItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
+
+
+class SellerVariantSerializer(serializers.ModelSerializer):
+    """
+    Read/write serializer for the seller panel's variant grid.
+
+    The product is taken from the URL, never the body, so a seller cannot
+    attach a variant to somebody else's listing.
+    """
+
+    option_values = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=AttributeValue.objects.select_related("attribute"),
+    )
+    option_label = serializers.CharField(read_only=True)
+    image_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductVariant
+        fields = (
+            "id",
+            "sku",
+            "option_values",
+            "option_label",
+            "price",
+            "stock",
+            "description",
+            "image",
+            "image_url",
+            "image_display",
+            "is_active",
+            "position",
+        )
+        read_only_fields = ("id", "sku")
+
+    def get_image_display(self, obj):
+        image = obj.display_image
+        if not image:
+            return ""
+        request = self.context.get("request")
+        if request is not None and image.startswith("/"):
+            return request.build_absolute_uri(image)
+        return image
+
+    def validate_price(self, value):
+        # Null is the "same as the product" case and stays allowed.
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Price must be greater than zero.")
+        return value
+
+    def validate_option_values(self, values):
+        if not values:
+            raise serializers.ValidationError("Pick at least one option.")
+
+        # A variant is one point in the grid, so two values of the same
+        # attribute cannot both apply: nothing is White and Black at once.
+        seen = {}
+        for value in values:
+            if value.attribute_id in seen:
+                raise serializers.ValidationError(
+                    f"Pick only one {value.attribute.name}: "
+                    f"{seen[value.attribute_id]} and {value.name} clash."
+                )
+            seen[value.attribute_id] = value.name
+
+        product = self.context["product"]
+        allowed = set(
+            Attribute.objects.filter(categories=product.category).values_list(
+                "id", flat=True
+            )
+        )
+        stray = [value.name for value in values if value.attribute_id not in allowed]
+        if stray:
+            raise serializers.ValidationError(
+                f"These do not apply to {product.category.name}: "
+                + ", ".join(stray)
+            )
+
+        return values
+
+    def validate(self, attrs):
+        values = attrs.get("option_values")
+        if values is None:
+            return attrs
+
+        product = self.context["product"]
+        combination = {value.pk for value in values}
+
+        # Two rows with the same options would be two prices for one thing.
+        siblings = product.variants.prefetch_related("option_values")
+        if self.instance is not None:
+            siblings = siblings.exclude(pk=self.instance.pk)
+
+        for sibling in siblings:
+            if {value.pk for value in sibling.option_values.all()} == combination:
+                raise serializers.ValidationError(
+                    {"option_values": [f"{sibling.option_label} already exists."]}
+                )
+
+        return attrs
+
+
+class VariantGenerateSerializer(serializers.Serializer):
+    """
+    Input for "build every combination": a flat list of chosen values.
+
+    They arrive flat because that is what a grid of checkboxes produces;
+    the view groups them by attribute before taking the product.
+    """
+
+    value_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=AttributeValue.objects.select_related("attribute"),
+    )
+
+
+class SellerOptionSerializer(serializers.Serializer):
+    """
+    Input for the "+" buttons in the seller's variant picker.
+
+    Either extends an existing group (`attribute_id`) or starts a new one
+    (`attribute_name`), and always adds one value. Sellers cannot reach the
+    Django admin, so this is the only way for them to say "this shoe also
+    comes in 45".
+    """
+
+    attribute_id = serializers.IntegerField(required=False)
+    attribute_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=80
+    )
+    name = serializers.CharField(max_length=80)
+    swatch_color = serializers.CharField(
+        required=False, allow_blank=True, max_length=7
+    )
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Type a name for the option.")
+        return value
+
+    def validate_swatch_color(self, value):
+        value = value.strip()
+        if not value:
+            return ""
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
+            raise serializers.ValidationError(
+                "Use a hex colour like #1D4ED8."
+            )
+        return value.upper()
+
+    def validate(self, attrs):
+        if not attrs.get("attribute_id") and not attrs.get("attribute_name", "").strip():
+            raise serializers.ValidationError(
+                {"attribute_name": ["Say which option group this belongs to."]}
+            )
+        return attrs
