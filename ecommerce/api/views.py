@@ -16,6 +16,7 @@ from ..models import (
     AttributeValue,
     Category,
     Product,
+    ProductImage,
     ProductVariant,
     SellerRating,
 )
@@ -37,6 +38,7 @@ from .serializers import (
     ProductSerializer,
     SellerRatingInputSerializer,
     SellerOptionSerializer,
+    SellerProductImageSerializer,
     SellerProductSerializer,
     SellerVariantSerializer,
     VariantGenerateSerializer,
@@ -694,6 +696,38 @@ class SellerOptionCreateView(SellerVariantMixin, APIView):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class SellerImageMixin(SellerVariantMixin):
+    """Same ownership rule, over the product's gallery."""
+
+    serializer_class = SellerProductImageSerializer
+
+    def get_queryset(self):
+        return ProductImage.objects.filter(
+            product=self.get_product()
+        ).order_by("position", "id")
+
+
+class SellerImageListCreateView(SellerImageMixin, generics.ListCreateAPIView):
+    """
+    GET  /api/v1/seller/products/<slug>/images/
+    POST /api/v1/seller/products/<slug>/images/
+    """
+
+    def perform_create(self, serializer):
+        product = self.get_product()
+        # New photos land at the end of the strip.
+        serializer.save(
+            product=product,
+            position=serializer.validated_data.get(
+                "position", product.gallery.count()
+            ),
+        )
+
+
+class SellerImageDetailView(SellerImageMixin, generics.RetrieveUpdateDestroyAPIView):
+    """GET / PATCH / DELETE /api/v1/seller/products/<slug>/images/<id>/"""
 
 
 # ── Cart ─────────────────────────────────────────────────────────────

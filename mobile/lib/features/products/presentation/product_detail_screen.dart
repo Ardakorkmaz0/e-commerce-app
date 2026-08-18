@@ -3,6 +3,7 @@ import 'package:ecommerce_mobile/features/cart/data/cart_repository.dart';
 import 'package:ecommerce_mobile/features/cart/presentation/providers/cart_provider.dart';
 import 'package:ecommerce_mobile/features/main/presentation/providers/tab_provider.dart';
 import 'package:ecommerce_mobile/features/products/data/models/product_model.dart';
+import 'package:ecommerce_mobile/features/products/presentation/product_gallery.dart';
 import 'package:ecommerce_mobile/features/products/presentation/providers/product_provider.dart';
 import 'package:ecommerce_mobile/features/products/presentation/seller_rating_bar.dart';
 import 'package:ecommerce_mobile/features/products/presentation/variant_picker.dart';
@@ -85,41 +86,18 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody> {
         ? findVariant(product.variants, _selection)
         : null;
 
-    // Each of these falls back to the product, so a variant that leaves its
-    // image or description blank simply inherits the product's.
-    final image = (variant?.imageUrl.isNotEmpty ?? false)
-        ? variant!.imageUrl
-        : product.imageUrl;
+    // The variant's own picture leads, then the cover, then the gallery.
+    final photos = buildPhotoStrip(product, variant);
+
+    // Falls back to the product, so a variant that leaves its description
+    // blank simply inherits the product's.
     final description = (variant?.description.isNotEmpty ?? false)
         ? variant!.description
         : product.description;
 
     return ListView(
       children: <Widget>[
-        // Image, matching the tinted panel used by the product cards
-        Container(
-          height: 280,
-          width: double.infinity,
-          color: AppColors.primary.withAlpha(20),
-          child: image.isEmpty
-              ? Icon(
-                  Icons.image_outlined,
-                  size: 96,
-                  color: AppColors.primary.withAlpha(100),
-                )
-              : Image.network(
-                  image,
-                  // Keyed so switching variants swaps the picture instead of
-                  // reusing the previous element's already-decoded image.
-                  key: ValueKey<String>(image),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 96,
-                    color: AppColors.primary.withAlpha(100),
-                  ),
-                ),
-        ),
+        ProductGallery(photos: photos, alt: product.name),
 
         Padding(
           padding: const EdgeInsets.all(20),

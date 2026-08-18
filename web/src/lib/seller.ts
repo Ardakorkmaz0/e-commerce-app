@@ -72,3 +72,24 @@ export async function fetchSellerVariants(
     return [];
   }
 }
+
+export type SellerImage = {
+  id: number;
+  url: string;
+  alt: string;
+  /** Null for photos shown whichever variant is chosen. */
+  variant: number | null;
+  position: number;
+};
+
+export async function fetchSellerImages(slug: string): Promise<SellerImage[]> {
+  try {
+    const response = await authorizedFetch(`/seller/products/${slug}/images/`);
+    if (!response?.ok) {
+      return [];
+    }
+    return (await response.json()) as SellerImage[];
+  } catch {
+    return [];
+  }
+}

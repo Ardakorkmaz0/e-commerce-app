@@ -2,6 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils.text import slugify
@@ -294,6 +295,63 @@ class ProductVariant(models.Model):
     @property
     def in_stock(self):
         return self.stock > 0
+
+
+class ProductImage(models.Model):
+    """
+    One extra photo in a product's gallery.
+
+    The product keeps its own `image`/`image_url` as the cover, which is
+    what lists and cards show. These are the rest of the strip: other
+    angles, what is in the box, a size chart.
+
+    A photo may belong to a variant, in which case it only appears while
+    that variant is chosen — the way a shop shows the black shoe's photos
+    when you pick black.
+    """
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="gallery",
+    )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.CASCADE,
+        related_name="gallery",
+        null=True,
+        blank=True,
+        help_text="Leave empty to show this photo for every variant.",
+    )
+
+    image = models.ImageField(upload_to="gallery/%Y/%m/", blank=True)
+    image_url = models.URLField(blank=True)
+
+    alt = models.CharField(
+        max_length=140,
+        blank=True,
+        help_text="Describes the photo for screen readers.",
+    )
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("position", "id")
+
+    def __str__(self):
+        return f"{self.product.name} photo {self.position}"
+
+    def clean(self):
+        if not self.image and not self.image_url:
+            raise ValidationError("Upload a file or paste a link.")
+        if self.variant_id and self.variant.product_id != self.product_id:
+            raise ValidationError("That variant belongs to another product.")
+
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return self.image_url
 
 
 class SellerRating(models.Model):

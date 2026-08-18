@@ -76,6 +76,9 @@ class _VariantsBody extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
+          SellerGalleryPanel(slug: slug, cover: product.imageUrl),
+          const SizedBox(height: 24),
+
           _GeneratorPanel(slug: slug, product: product),
           const SizedBox(height: 20),
 
@@ -819,6 +822,590 @@ class _NewOptionDialogState extends State<_NewOptionDialog> {
           child: const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+/// Mirrors MAX_GALLERY_PHOTOS in the API, which enforces it.
+const int maxGalleryPhotos = 6;
+
+/// The extra photos, in the order a shopper will flip through them.
+///
+/// Sits above the variant grid on the same screen: a photo is usually
+/// added right after the variant it belongs to, so making the seller
+/// navigate elsewhere for it would be a step backwards.
+class SellerGalleryPanel extends ConsumerWidget {
+  const SellerGalleryPanel({
+    super.key,
+    required this.slug,
+    required this.cover,
+  });
+
+  final String slug;
+
+  /// The product's own picture, which always leads the strip.
+  final String cover;
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final variants =
+        ref.read(sellerVariantsProvider(slug)).valueOrNull ??
+        const <SellerVariant>[];
+
+    final result = await showDialog<_NewPhoto>(
+      context: context,
+      builder: (_) => _NewPhotoDialog(variants: variants),
+    );
+    if (result == null) return;
+
+    try {
+      await ref
+          .read(sellerVariantRepositoryProvider)
+          .addImage(
+            slug,
+            imageUrl: result.url,
+            alt: result.alt,
+            variantId: result.variantId,
+          );
+      ref.invalidate(sellerImagesProvider(slug));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(describeVariantError(error))));
+    }
+  }
+
+  void _edit(
+    BuildContext context, {
+    required SellerImage image,
+    required int index,
+    required int total,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Consumer(
+        builder: (_, sheetRef, _) => PhotoEditSheet(
+          slug: slug,
+          image: image,
+          index: index,
+          total: total,
+          variants:
+              sheetRef.watch(sellerVariantsProvider(slug)).valueOrNull ??
+              const <SellerVariant>[],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final images = ref.watch(sellerImagesProvider(slug));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text('Photos', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(
+          'The thumbnail strip beside the product picture. Pin one to a '
+          'variant and it only shows while that variant is chosen.',
+          style: TextStyle(color: context.mutedText, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+
+        images.when(
+          loading: () => const SizedBox(
+            height: 92,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, _) => Text(
+            describeVariantError(error),
+            style: const TextStyle(color: Color(0xFFB91C1C)),
+          ),
+          data: (List<SellerImage> items) {
+            final full = items.length >= maxGalleryPhotos;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                SizedBox(
+                  height: 96,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    // The cover, then the gallery, then the add tile.
+                    itemCount: items.length + (full ? 1 : 2),
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _PhotoTile(
+                          url: cover,
+                          caption: 'Cover',
+                          // Comes from the product form, not this list.
+                          dimmed: true,
+                        );
+                      }
+                      if (index <= items.length) {
+                        final image = items[index - 1];
+                        return _PhotoTile(
+                          url: image.url,
+                          caption: image.variantId == null ? 'All' : 'Variant',
+                          onTap: () => _edit(
+                            context,
+                            image: image,
+                            index: index - 1,
+                            total: items.length,
+                          ),
+                        );
+                      }
+                      return _AddPhotoTile(onTap: () => _add(context, ref));
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  full
+                      ? 'That is all $maxGalleryPhotos extra photos. Tap one '
+                            'to replace or delete it.'
+                      : '${items.length} of $maxGalleryPhotos extra photos. '
+                            'Tap one to edit it.',
+                  style: TextStyle(color: context.mutedText, fontSize: 11),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _PhotoTile extends StatelessWidget {
+  const _PhotoTile({
+    required this.url,
+    required this.caption,
+    this.dimmed = false,
+    this.onTap,
+  });
+
+  final String url;
+  final String caption;
+  final bool dimmed;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: dimmed ? 0.6 : 1,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Stack(
+              children: <Widget>[
+                Container(
+                  width: 68,
+                  height: 68,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: context.borderColor),
+                  ),
+                  child: url.isEmpty
+                      ? Icon(Icons.image_outlined, color: context.mutedText)
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => Icon(
+                              Icons.image_not_supported_outlined,
+                              color: context.mutedText,
+                            ),
+                          ),
+                        ),
+                ),
+                // A quiet corner badge, so the thumbnail stays the thing
+                // being looked at. The whole tile is the tap target.
+                if (onTap != null)
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: context.accent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.edit_outlined,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              caption,
+              style: TextStyle(color: context.mutedText, fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddPhotoTile extends StatelessWidget {
+  const _AddPhotoTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: context.accent.withAlpha(28),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.add_rounded, size: 30, color: context.accent),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Add',
+            style: TextStyle(
+              color: context.accent,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewPhoto {
+  const _NewPhoto({
+    required this.url,
+    required this.alt,
+    required this.variantId,
+  });
+
+  final String url;
+  final String alt;
+  final int? variantId;
+}
+
+class _NewPhotoDialog extends StatefulWidget {
+  const _NewPhotoDialog({required this.variants});
+
+  final List<SellerVariant> variants;
+
+  @override
+  State<_NewPhotoDialog> createState() => _NewPhotoDialogState();
+}
+
+class _NewPhotoDialogState extends State<_NewPhotoDialog> {
+  final _url = TextEditingController();
+  final _alt = TextEditingController();
+  int? _variantId;
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _alt.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add a photo'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            TextField(
+              controller: _url,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Image URL',
+                hintText: 'https://...',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _alt,
+              maxLength: 140,
+              decoration: const InputDecoration(
+                labelText: 'Alt text',
+                hintText: 'What the photo shows',
+              ),
+            ),
+            if (widget.variants.isNotEmpty)
+              DropdownButtonFormField<int?>(
+                initialValue: _variantId,
+                decoration: const InputDecoration(labelText: 'Show for'),
+                items: <DropdownMenuItem<int?>>[
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Every variant'),
+                  ),
+                  for (final variant in widget.variants)
+                    DropdownMenuItem<int?>(
+                      value: variant.id,
+                      child: Text(variant.optionLabel),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _variantId = value),
+              ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _url.text.trim().isEmpty
+              ? null
+              : () => Navigator.of(context).pop(
+                  _NewPhoto(
+                    url: _url.text.trim(),
+                    alt: _alt.text.trim(),
+                    variantId: _variantId,
+                  ),
+                ),
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Everything about one photo, edited where it sits: which picture, what
+/// it shows, which variant it belongs to, and where it sits in the strip.
+class PhotoEditSheet extends ConsumerStatefulWidget {
+  const PhotoEditSheet({
+    super.key,
+    required this.slug,
+    required this.image,
+    required this.index,
+    required this.total,
+    required this.variants,
+  });
+
+  final String slug;
+  final SellerImage image;
+  final int index;
+  final int total;
+  final List<SellerVariant> variants;
+
+  @override
+  ConsumerState<PhotoEditSheet> createState() => _PhotoEditSheetState();
+}
+
+class _PhotoEditSheetState extends ConsumerState<PhotoEditSheet> {
+  late final TextEditingController _url;
+  late final TextEditingController _alt;
+  late int? _variantId;
+
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = TextEditingController(text: widget.image.url);
+    _alt = TextEditingController(text: widget.image.alt);
+    // A variant that was deleted leaves an id nothing matches, which would
+    // make the dropdown throw; fall back to "every variant".
+    _variantId = widget.variants.any((v) => v.id == widget.image.variantId)
+        ? widget.image.variantId
+        : null;
+  }
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _alt.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run(Future<void> Function() action, {bool close = true}) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      await action();
+      ref.invalidate(sellerImagesProvider(widget.slug));
+      if (!mounted) return;
+      if (close) Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = describeVariantError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = ref.read(sellerVariantRepositoryProvider);
+
+    return Padding(
+      // Lifts the sheet above the keyboard rather than hiding the fields.
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Photo ${widget.index + 1} of ${widget.total}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _url,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Image URL',
+                hintText: 'https://...',
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _alt,
+              maxLength: 140,
+              decoration: const InputDecoration(
+                labelText: 'Alt text',
+                hintText: 'What the photo shows',
+              ),
+            ),
+
+            if (widget.variants.isNotEmpty)
+              DropdownButtonFormField<int?>(
+                initialValue: _variantId,
+                decoration: const InputDecoration(labelText: 'Show for'),
+                items: <DropdownMenuItem<int?>>[
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Every variant'),
+                  ),
+                  for (final variant in widget.variants)
+                    DropdownMenuItem<int?>(
+                      value: variant.id,
+                      child: Text(variant.optionLabel),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _variantId = value),
+              ),
+
+            const SizedBox(height: 16),
+            Text(
+              'POSITION IN THE STRIP',
+              style: TextStyle(
+                color: context.mutedText,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('Earlier'),
+                  onPressed: _busy || widget.index == 0
+                      ? null
+                      : () => _run(
+                          () => repository.moveImage(
+                            widget.slug,
+                            widget.image.id,
+                            widget.index - 1,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.arrow_forward, size: 18),
+                  label: const Text('Later'),
+                  onPressed: _busy || widget.index >= widget.total - 1
+                      ? null
+                      : () => _run(
+                          () => repository.moveImage(
+                            widget.slug,
+                            widget.image.id,
+                            widget.index + 1,
+                          ),
+                        ),
+                ),
+              ],
+            ),
+
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: Color(0xFFB91C1C))),
+            ],
+
+            const SizedBox(height: 20),
+            GradientButton(
+              label: _busy ? 'Saving...' : 'Save',
+              onPressed: _busy || _url.text.trim().isEmpty
+                  ? null
+                  : () => _run(
+                      () => repository.updateImage(
+                        widget.slug,
+                        widget.image.id,
+                        imageUrl: _url.text.trim(),
+                        alt: _alt.text.trim(),
+                        variantId: _variantId,
+                      ),
+                    ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              label: const Text(
+                'Delete photo',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: _busy
+                  ? null
+                  : () => _run(
+                      () => repository.removeImage(widget.slug, widget.image.id),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

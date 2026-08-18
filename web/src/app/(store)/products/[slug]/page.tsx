@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { ProductCard } from "@/components/product-card";
-import { VariantMedia } from "@/components/variant-media";
+import { ProductGallery } from "@/components/product-gallery";
 import { VariantPicker } from "@/components/variant-picker";
 import { VariantPrice } from "@/components/variant-price";
 import { VariantSelectionProvider } from "@/components/variant-selection";
@@ -75,33 +75,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="row g-4 align-items-start">
           {/* Image */}
           <div className="col-12 col-lg-6">
-            <div className="product-detail-media">
-              {hasVariants ? (
-                <VariantMedia
-                  fallbackImage={product.image_url}
-                  alt={product.name}
-                />
-              ) : product.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="product-detail-image"
-                />
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="96"
-                  height="96"
-                  fill="currentColor"
-                  viewBox="0 0 16 16"
-                  aria-hidden="true"
-                >
-                  <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />
-                  <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z" />
-                </svg>
-              )}
-            </div>
+            <ProductGallery
+              cover={product.image_url}
+              alt={product.name}
+              images={product.images ?? []}
+              withVariants={hasVariants}
+            />
           </div>
 
           {/* Details */}

@@ -3109,3 +3109,207 @@ body {
   color: var(--site-muted-text);
   font-size: 0.75rem;
 }
+
+/* ── Product gallery ────────────────────────────────────────────────── */
+/* Thumbnail rail beside the large photo. The rail shares the panel's
+   background so the two read as one surface rather than two boxes. */
+
+.product-gallery {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+/* One photo needs no rail, so the panel takes the whole width. */
+.product-gallery:has(> .product-detail-media:first-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.product-gallery-thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 520px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.product-gallery-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 6px;
+  overflow: hidden;
+  background: var(--site-control-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.product-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.product-gallery-thumb:hover,
+.product-gallery-thumb:focus-visible {
+  border-color: var(--site-accent);
+  outline: none;
+}
+
+.product-gallery-thumb.active {
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 2px var(--site-focus-ring);
+}
+
+@media (max-width: 767.98px) {
+  /* On a phone the rail lies under the photo and scrolls sideways —
+     a vertical column would eat half the screen width. */
+  .product-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .product-gallery-thumbs {
+    flex-direction: row;
+    order: 2;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .product-gallery-thumb {
+    width: 64px;
+    flex: 0 0 64px;
+  }
+}
+
+/* ── Seller gallery ─────────────────────────────────────────────────── */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.gallery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  background: var(--site-input-bg);
+  border: 1px solid var(--site-navbar-border);
+  border-radius: 12px;
+}
+
+/* The cover is not editable here; it comes from the form above. */
+.gallery-card-cover {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.gallery-card-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--site-control-bg);
+  border-radius: 8px;
+}
+
+.gallery-card-media img {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  object-fit: contain;
+}
+
+.gallery-card-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-card-tag {
+  overflow: hidden;
+  color: var(--site-muted-text);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.15rem;
+}
+
+/* Square, quiet buttons: the row sits under a thumbnail, so text labels
+   would be wider than the card. */
+.gallery-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--site-muted-text);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.gallery-icon-button:hover:not(:disabled),
+.gallery-icon-button:focus-visible {
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+  outline: none;
+}
+
+.gallery-icon-button.danger:hover:not(:disabled) {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.gallery-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.gallery-icon-button[aria-expanded="true"] {
+  color: var(--site-accent);
+  background: var(--site-control-bg);
+}
+
+/* Opens under its own card, so a wide card does not push the grid about. */
+.gallery-card-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--site-navbar-border);
+}
+
+.gallery-card-edit .variant-field > span {
+  font-size: 0.65rem;
+}
+
+.gallery-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.gallery-form-submit,
+.gallery-form-message {
+  grid-column: 1 / -1;
+}

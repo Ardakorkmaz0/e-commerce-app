@@ -877,3 +877,219 @@ class SellerOptionApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+class ProductGalleryApiTests(TestCase):
+    """Extra photos: the strip a shopper flips through."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        sellers, _ = Group.objects.get_or_create(name="Sellers")
+        self.seller = User.objects.create_user(
+            username="gallery-seller",
+            email="gallery-seller@example.com",
+            password="pw-for-tests-only",
+        )
+        self.seller.groups.add(sellers)
+
+        self.category = Category.objects.create(name="Cameras")
+        self.product = Product.objects.create(
+            name="Mirrorless",
+            description="A camera.",
+            price=Decimal("900.00"),
+            stock=3,
+            category=self.category,
+            seller=self.seller,
+            image_url="https://example.com/cover.png",
+        )
+
+        colour = Attribute.objects.create(name="Body Colour", position=1)
+        colour.categories.add(self.category)
+        self.black = AttributeValue.objects.create(
+            attribute=colour, name="Black", swatch_color="#111827"
+        )
+        self.variant = ProductVariant.objects.create(product=self.product, stock=2)
+        self.variant.option_values.set([self.black])
+
+        self.url = f"/api/v1/seller/products/{self.product.slug}/images/"
+
+    def test_a_seller_adds_photos_and_they_reach_the_product(self):
+        self.client.force_authenticate(self.seller)
+
+        for index in range(3):
+            response = self.client.post(
+                self.url,
+                {
+                    "image_url": f"https://example.com/angle-{index}.png",
+                    "alt": f"Angle {index}",
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(None)
+        data = self.client.get(f"/api/v1/products/{self.product.slug}/").json()
+
+        self.assertEqual(len(data["images"]), 3)
+        self.assertEqual(
+            [image["alt"] for image in data["images"]],
+            ["Angle 0", "Angle 1", "Angle 2"],
+        )
+        # The cover stays its own field; the gallery is what comes after.
+        self.assertEqual(data["image_url"], "https://example.com/cover.png")
+
+    def test_new_photos_land_at_the_end_of_the_strip(self):
+        self.client.force_authenticate(self.seller)
+
+        for index in range(3):
+            self.client.post(
+                self.url,
+                {"image_url": f"https://example.com/{index}.png"},
+                format="json",
+            )
+
+        self.assertEqual(
+            list(self.product.gallery.values_list("position", flat=True)), [0, 1, 2]
+        )
+
+    def test_a_photo_can_be_pinned_to_one_variant(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            self.url,
+            {
+                "image_url": "https://example.com/black.png",
+                "variant": self.variant.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["variant"], self.variant.pk)
+
+    def test_a_variant_of_another_product_is_rejected(self):
+        other = Product.objects.create(
+            name="Lens",
+            description="Glass.",
+            price=Decimal("300.00"),
+            stock=1,
+            category=self.category,
+            seller=self.seller,
+        )
+        stray = ProductVariant.objects.create(product=other, stock=1)
+
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            self.url,
+            {"image_url": "https://example.com/x.png", "variant": stray.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_photo_with_neither_a_file_nor_a_link_is_rejected(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(self.url, {"alt": "Nothing"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reordering_and_deleting(self):
+        self.client.force_authenticate(self.seller)
+        first = self.client.post(
+            self.url, {"image_url": "https://example.com/a.png"}, format="json"
+        ).json()
+        second = self.client.post(
+            self.url, {"image_url": "https://example.com/b.png"}, format="json"
+        ).json()
+
+        moved = self.client.patch(
+            f"{self.url}{second['id']}/", {"position": 0}, format="json"
+        )
+        self.assertEqual(moved.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [image.pk for image in self.product.gallery.all()],
+            [second["id"], first["id"]],
+        )
+
+        removed = self.client.delete(f"{self.url}{first['id']}/")
+        self.assertEqual(removed.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.product.gallery.count(), 1)
+
+    def test_another_seller_cannot_touch_this_gallery(self):
+        sellers = Group.objects.get(name="Sellers")
+        intruder = User.objects.create_user(
+            username="gallery-intruder",
+            email="gallery-intruder@example.com",
+            password="pw-for-tests-only",
+        )
+        intruder.groups.add(sellers)
+
+        self.client.force_authenticate(self.seller)
+        mine = self.client.post(
+            self.url, {"image_url": "https://example.com/a.png"}, format="json"
+        ).json()
+
+        self.client.force_authenticate(intruder)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(
+            self.client.delete(f"{self.url}{mine['id']}/").status_code, 404
+        )
+
+    def test_deleting_a_variant_takes_its_photos_with_it(self):
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            self.url,
+            {"image_url": "https://example.com/black.png", "variant": self.variant.pk},
+            format="json",
+        )
+        self.client.post(
+            self.url, {"image_url": "https://example.com/shared.png"}, format="json"
+        )
+
+        self.variant.delete()
+
+        # The shared photo has no variant, so it survives.
+        self.assertEqual(
+            list(self.product.gallery.values_list("image_url", flat=True)),
+            ["https://example.com/shared.png"],
+        )
+
+    def test_the_gallery_stops_at_six_photos(self):
+        self.client.force_authenticate(self.seller)
+
+        for index in range(6):
+            response = self.client.post(
+                self.url,
+                {"image_url": f"https://example.com/{index}.png"},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        seventh = self.client.post(
+            self.url, {"image_url": "https://example.com/7.png"}, format="json"
+        )
+
+        self.assertEqual(seventh.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Remove one", str(seventh.json()))
+        self.assertEqual(self.product.gallery.count(), 6)
+
+    def test_a_full_gallery_can_still_be_edited(self):
+        self.client.force_authenticate(self.seller)
+        ids = [
+            self.client.post(
+                self.url,
+                {"image_url": f"https://example.com/{index}.png"},
+                format="json",
+            ).json()["id"]
+            for index in range(6)
+        ]
+
+        # The limit is about adding, not about touching what is there.
+        response = self.client.patch(
+            f"{self.url}{ids[0]}/", {"alt": "Renamed"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["alt"], "Renamed")

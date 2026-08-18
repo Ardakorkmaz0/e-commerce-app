@@ -23,3 +23,9 @@ final sellerVariantsProvider =
 final sellerAttributesProvider = FutureProvider<List<SellerAttribute>>((ref) {
   return ref.watch(sellerVariantRepositoryProvider).fetchAttributes();
 });
+
+/// The extra photos of one of the seller's own products.
+final sellerImagesProvider =
+    FutureProvider.family<List<SellerImage>, String>((ref, slug) {
+      return ref.watch(sellerVariantRepositoryProvider).fetchImages(slug);
+    });

@@ -3,10 +3,15 @@ import { notFound, redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth";
 import { fetchAttributes, fetchCategories } from "@/lib/products";
-import { fetchSellerProduct, fetchSellerVariants } from "@/lib/seller";
+import {
+  fetchSellerImages,
+  fetchSellerProduct,
+  fetchSellerVariants,
+} from "@/lib/seller";
 
 import { updateProduct } from "../../actions";
 import { ProductForm } from "../../product-form";
+import { GallerySection } from "../images/gallery-section";
 import { VariantSection } from "../variants/variant-section";
 
 export const metadata: Metadata = {
@@ -28,11 +33,12 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
   const { slug } = await params;
 
-  const [product, categories, attributes, variants] = await Promise.all([
+  const [product, categories, attributes, variants, images] = await Promise.all([
     fetchSellerProduct(slug),
     fetchCategories(),
     fetchAttributes(),
     fetchSellerVariants(slug),
+    fetchSellerImages(slug),
   ]);
 
   // The API only returns the seller's own products, so a missing result
@@ -66,6 +72,13 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
           }}
         />
       </div>
+
+      <GallerySection
+        slug={product.slug}
+        cover={product.image_display}
+        images={images}
+        variants={variants}
+      />
 
       <VariantSection
         slug={product.slug}

@@ -52,6 +52,7 @@ export type Product = {
   // itself; with variants, one has to be chosen before adding to the cart.
   has_variants?: boolean;
   total_stock?: number;
+  images?: ProductImage[];
   variants?: ProductVariant[];
   option_groups?: OptionGroup[];
   price_from?: string;
@@ -69,3 +70,13 @@ export function formatPrice(price: string): string {
   const amount = Number(price);
   return Number.isFinite(amount) ? `$${amount.toFixed(2)}` : price;
 }
+
+/** One photo in a product's gallery strip. */
+export type ProductImage = {
+  id: number;
+  url: string;
+  alt: string;
+  /** Null for photos that stay on screen whichever variant is chosen. */
+  variant: number | null;
+  position: number;
+};

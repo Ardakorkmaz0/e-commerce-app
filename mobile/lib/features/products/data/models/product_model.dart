@@ -98,6 +98,32 @@ class OptionGroup {
   }
 }
 
+/// One photo in the gallery strip.
+class ProductPhoto {
+  const ProductPhoto({
+    required this.id,
+    required this.url,
+    required this.alt,
+    required this.variantId,
+  });
+
+  final int id;
+  final String url;
+  final String alt;
+
+  /// Null for photos that stay on screen whichever variant is chosen.
+  final int? variantId;
+
+  factory ProductPhoto.fromJson(Map<String, dynamic> json) {
+    return ProductPhoto(
+      id: json['id'] as int,
+      url: json['url'] as String? ?? '',
+      alt: json['alt'] as String? ?? '',
+      variantId: json['variant'] as int?,
+    );
+  }
+}
+
 class ProductVariant {
   const ProductVariant({
     required this.id,
@@ -161,6 +187,7 @@ class Product {
     this.hasVariants = false,
     this.variants = const <ProductVariant>[],
     this.optionGroups = const <OptionGroup>[],
+    this.photos = const <ProductPhoto>[],
   });
 
   final int id;
@@ -189,6 +216,7 @@ class Product {
   final bool hasVariants;
   final List<ProductVariant> variants;
   final List<OptionGroup> optionGroups;
+  final List<ProductPhoto> photos;
 
   /// Parses both catalog shapes.
   ///
@@ -230,6 +258,9 @@ class Product {
           .toList(),
       optionGroups: (json['option_groups'] as List<dynamic>? ?? <dynamic>[])
           .map((item) => OptionGroup.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      photos: (json['images'] as List<dynamic>? ?? <dynamic>[])
+          .map((item) => ProductPhoto.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }

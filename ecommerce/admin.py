@@ -6,6 +6,7 @@ from .models import (
     AttributeValue,
     Category,
     Product,
+    ProductImage,
     ProductVariant,
     SellerRating,
 )
@@ -16,6 +17,17 @@ class AttributeValueInline(admin.TabularInline):
     extra = 3
     prepopulated_fields = {"slug": ("name",)}
     fields = ("name", "slug", "swatch_color", "position")
+
+
+class ProductImageInline(admin.TabularInline):
+    """
+    The gallery strip. Leave `variant` empty for a photo that applies to
+    the whole product; set it to show the photo only for that variant.
+    """
+
+    model = ProductImage
+    extra = 2
+    fields = ("image", "image_url", "alt", "variant", "position")
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -95,7 +107,7 @@ class ProductAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("image_preview",)
     filter_horizontal = ("attribute_values",)
-    inlines = [ProductVariantInline]
+    inlines = [ProductVariantInline, ProductImageInline]
 
     BASE_FIELDSETS = (
         (None, {"fields": ("name", "slug", "category", "description")}),

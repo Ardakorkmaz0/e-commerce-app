@@ -117,6 +117,78 @@ class SellerVariantRepository {
     );
   }
 
+  // ── Gallery ───────────────────────────────────────────────────────
+
+  Future<List<SellerImage>> fetchImages(String slug) async {
+    final response = await _apiClient.dio.get(
+      'seller/products/$slug/images/',
+      options: await _authOptions(),
+    );
+    final data = response.data;
+    final items = data is Map<String, dynamic>
+        ? data['results'] as List<dynamic>
+        : data as List<dynamic>;
+    return items
+        .map((item) => SellerImage.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// [variantId] pins the photo to one combination; null shows it for all.
+  Future<void> addImage(
+    String slug, {
+    required String imageUrl,
+    String alt = '',
+    int? variantId,
+  }) async {
+    await _apiClient.dio.post(
+      'seller/products/$slug/images/',
+      data: <String, dynamic>{
+        'image_url': imageUrl,
+        'alt': alt,
+        'variant': variantId,
+      },
+      options: await _authOptions(),
+    );
+  }
+
+  /// Edits a photo in place: its picture, its caption, its variant.
+  ///
+  /// [variantId] null means "show for every variant", which is a real
+  /// choice here rather than a missing value, so it is always sent.
+  Future<void> updateImage(
+    String slug,
+    int imageId, {
+    required String imageUrl,
+    required String alt,
+    required int? variantId,
+  }) async {
+    await _apiClient.dio.patch(
+      'seller/products/$slug/images/$imageId/',
+      data: <String, dynamic>{
+        'image_url': imageUrl,
+        'alt': alt,
+        'variant': variantId,
+      },
+      options: await _authOptions(),
+    );
+  }
+
+  /// The server shifts the rest of the strip along.
+  Future<void> moveImage(String slug, int imageId, int position) async {
+    await _apiClient.dio.patch(
+      'seller/products/$slug/images/$imageId/',
+      data: <String, dynamic>{'position': position},
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> removeImage(String slug, int imageId) async {
+    await _apiClient.dio.delete(
+      'seller/products/$slug/images/$imageId/',
+      options: await _authOptions(),
+    );
+  }
+
   Future<void> remove(String slug, int variantId) async {
     await _apiClient.dio.delete(
       'seller/products/$slug/variants/$variantId/',

@@ -11,6 +11,8 @@ from .views import (
     ProductListView,
     SellerRatingView,
     SellerProductDetailView,
+    SellerImageDetailView,
+    SellerImageListCreateView,
     SellerOptionCreateView,
     SellerProductListCreateView,
     SellerVariantDetailView,
@@ -51,6 +53,16 @@ urlpatterns = [
         "seller/products/<slug:slug>/",
         SellerProductDetailView.as_view(),
         name="seller_product_detail",
+    ),
+    path(
+        "seller/products/<slug:slug>/images/",
+        SellerImageListCreateView.as_view(),
+        name="seller_images",
+    ),
+    path(
+        "seller/products/<slug:slug>/images/<int:pk>/",
+        SellerImageDetailView.as_view(),
+        name="seller_image_detail",
     ),
     path(
         "seller/products/<slug:slug>/options/",

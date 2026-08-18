@@ -97,3 +97,34 @@ class SellerVariant {
     );
   }
 }
+
+
+/// One photo in the seller's gallery strip.
+class SellerImage {
+  const SellerImage({
+    required this.id,
+    required this.url,
+    required this.alt,
+    required this.variantId,
+    required this.position,
+  });
+
+  final int id;
+  final String url;
+  final String alt;
+
+  /// Null for photos shown whichever variant is chosen.
+  final int? variantId;
+
+  final int position;
+
+  factory SellerImage.fromJson(Map<String, dynamic> json) {
+    return SellerImage(
+      id: json['id'] as int,
+      url: json['url'] as String? ?? '',
+      alt: json['alt'] as String? ?? '',
+      variantId: json['variant'] as int?,
+      position: json['position'] as int? ?? 0,
+    );
+  }
+}

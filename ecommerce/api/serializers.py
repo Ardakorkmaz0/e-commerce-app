@@ -9,6 +9,7 @@ from ..models import (
     CartItem,
     Category,
     Product,
+    ProductImage,
     ProductVariant,
 )
 
@@ -117,6 +118,126 @@ class SellerProductSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ProductImageSerializer(serializers.ModelSerializer):
+    """
+    One photo in the gallery strip.
+
+    `variant` is null for photos that belong to the product as a whole;
+    the client keeps those on screen whichever variant is chosen and shows
+    the variant-specific ones alongside.
+    """
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImage
+        fields = ("id", "url", "alt", "variant", "position")
+        read_only_fields = fields
+
+    def get_url(self, obj):
+        image = obj.display_image
+        if not image:
+            return ""
+        request = self.context.get("request")
+        if request is not None and image.startswith("/"):
+            return request.build_absolute_uri(image)
+        return image
+
+
+#: How many extra photos a product may carry, beyond its cover. Enough to
+#: show a product from every side without turning the strip into a scroll.
+MAX_GALLERY_PHOTOS = 6
+
+
+class SellerProductImageSerializer(serializers.ModelSerializer):
+    """Write serializer for the seller panel's gallery."""
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImage
+        fields = (
+            "id",
+            "url",
+            "image",
+            "image_url",
+            "alt",
+            "variant",
+            "position",
+        )
+        read_only_fields = ("id", "url")
+        extra_kwargs = {"image": {"write_only": True}}
+
+    def get_url(self, obj):
+        image = obj.display_image
+        if not image:
+            return ""
+        request = self.context.get("request")
+        if request is not None and image.startswith("/"):
+            return request.build_absolute_uri(image)
+        return image
+
+    def validate_variant(self, value):
+        # A photo can only be pinned to a variant of the same product.
+        if value is not None and value.product_id != self.context["product"].pk:
+            raise serializers.ValidationError(
+                "That variant belongs to another product."
+            )
+        return value
+
+    def validate(self, attrs):
+        image = attrs.get("image", getattr(self.instance, "image", None))
+        link = attrs.get("image_url", getattr(self.instance, "image_url", ""))
+        if not image and not link:
+            raise serializers.ValidationError(
+                {"image_url": ["Upload a file or paste a link."]}
+            )
+
+        # Only on create: editing the sixth photo must stay possible.
+        if self.instance is None:
+            existing = self.context["product"].gallery.count()
+            if existing >= MAX_GALLERY_PHOTOS:
+                raise serializers.ValidationError(
+                    {
+                        "image_url": [
+                            f"A product can have {MAX_GALLERY_PHOTOS} extra "
+                            "photos. Remove one to add another."
+                        ]
+                    }
+                )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        """
+        Moving a photo pushes the others aside.
+
+        Writing the new position alone left two rows claiming the same
+        index, and the strip then fell back to insertion order — so "move
+        to the front" quietly did nothing.
+        """
+        moved_to = validated_data.pop("position", None)
+        instance = super().update(instance, validated_data)
+
+        if moved_to is None:
+            return instance
+
+        siblings = [
+            photo
+            for photo in instance.product.gallery.order_by("position", "id")
+            if photo.pk != instance.pk
+        ]
+        siblings.insert(min(max(int(moved_to), 0), len(siblings)), instance)
+
+        for index, photo in enumerate(siblings):
+            if photo.position != index:
+                photo.position = index
+                photo.save(update_fields=["position"])
+
+        instance.refresh_from_db()
+        return instance
+
+
 class ProductVariantSerializer(serializers.ModelSerializer):
     """
     One buyable combination.
@@ -176,6 +297,7 @@ class ProductSerializer(serializers.ModelSerializer):
     seller = serializers.SerializerMethodField()
 
     has_variants = serializers.BooleanField(read_only=True)
+    images = ProductImageSerializer(source="gallery", many=True, read_only=True)
     # The product's own stock column stays 0 once variants carry it, so the
     # badge needs the total rather than the column.
     total_stock = serializers.IntegerField(read_only=True)
@@ -277,6 +399,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "seller",
             "has_variants",
             "total_stock",
+            "images",
             "variants",
             "option_groups",
             "price_from",
