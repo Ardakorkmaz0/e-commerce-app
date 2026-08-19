@@ -53,18 +53,38 @@ class Cart {
     required this.items,
     required this.itemCount,
     required this.subtotal,
+    required this.shipping,
+    required this.total,
+    required this.freeShippingRemaining,
+    required this.freeShippingThreshold,
     required this.hasStockIssues,
   });
 
   final List<CartItem> items;
   final int itemCount;
+
+  // Every amount is worked out by the server, so the checkout screen shows
+  // these rather than adding anything up itself.
   final String subtotal;
+  final String shipping;
+  final String total;
+
+  /// '0.00' once delivery is free.
+  final String freeShippingRemaining;
+  final String freeShippingThreshold;
+
   final bool hasStockIssues;
+
+  bool get shipsFree => (double.tryParse(shipping) ?? 0) == 0;
 
   static const empty = Cart(
     items: <CartItem>[],
     itemCount: 0,
     subtotal: '0.00',
+    shipping: '0.00',
+    total: '0.00',
+    freeShippingRemaining: '0.00',
+    freeShippingThreshold: '0.00',
     hasStockIssues: false,
   );
 
@@ -77,6 +97,12 @@ class Cart {
           .toList(),
       itemCount: json['item_count'] as int? ?? 0,
       subtotal: json['subtotal']?.toString() ?? '0.00',
+      shipping: json['shipping']?.toString() ?? '0.00',
+      total: json['total']?.toString() ?? '0.00',
+      freeShippingRemaining:
+          json['free_shipping_remaining']?.toString() ?? '0.00',
+      freeShippingThreshold:
+          json['free_shipping_threshold']?.toString() ?? '0.00',
       hasStockIssues: json['has_stock_issues'] as bool? ?? false,
     );
   }

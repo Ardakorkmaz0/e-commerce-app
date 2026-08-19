@@ -5,6 +5,9 @@ from .models import (
     Attribute,
     AttributeValue,
     Category,
+    Order,
+    OrderItem,
+    Payment,
     Product,
     ProductImage,
     ProductVariant,
@@ -224,3 +227,94 @@ class SellerRatingAdmin(admin.ModelAdmin):
         "customer__username",
     )
     readonly_fields = ("created_at", "updated_at")
+
+
+class OrderItemInline(admin.TabularInline):
+    """
+    An order is a record of what happened, so nothing here is editable.
+
+    Correcting a line after the fact would rewrite what the shopper agreed
+    to pay; the way to change an order is to cancel it.
+    """
+
+    model = OrderItem
+    extra = 0
+    can_delete = False
+    fields = (
+        "name",
+        "option_label",
+        "seller_name",
+        "unit_price",
+        "quantity",
+        "line_total",
+        "shipped_at",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class PaymentInline(admin.TabularInline):
+    """Every attempt, including the declined ones."""
+
+    model = Payment
+    extra = 0
+    can_delete = False
+    fields = ("status", "amount", "card_brand", "card_last4", "reference",
+              "failure_reason", "created_at")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = (
+        "order_number",
+        "user",
+        "status",
+        "total",
+        "created_at",
+    )
+    list_filter = ("status", "created_at")
+    search_fields = ("order_number", "user__username", "recipient_name")
+    date_hierarchy = "created_at"
+    inlines = [OrderItemInline, PaymentInline]
+
+    readonly_fields = (
+        "order_number",
+        "user",
+        "status",
+        "currency",
+        "subtotal",
+        "shipping",
+        "total",
+        "recipient_name",
+        "phone_number",
+        "address_line_1",
+        "address_line_2",
+        "district",
+        "city",
+        "postal_code",
+        "country_code",
+        "card_brand",
+        "card_last4",
+        "idempotency_key",
+        "created_at",
+        "paid_at",
+        "shipped_at",
+        "delivered_at",
+        "cancelled_at",
+    )
+
+    def has_add_permission(self, request):
+        # Orders come from the checkout, never from here.
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("items", "payments")

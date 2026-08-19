@@ -9,10 +9,15 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from .management.commands.seed_catalog import DEMO_PRODUCTS
+from accounts.models import DeliveryAddress, PaymentMethod
+
+from .payments import charge
 from .models import (
     Attribute,
     AttributeValue,
     Category,
+    Order,
+    Payment,
     Product,
     ProductVariant,
     SellerRating,
@@ -1093,3 +1098,577 @@ class ProductGalleryApiTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["alt"], "Renamed")
+
+
+class CartShippingTests(TestCase):
+    """What the checkout screen quotes for delivery."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="shipping-shopper",
+            email="shipping-shopper@example.com",
+            password="pw-for-tests-only",
+        )
+        self.client.force_authenticate(self.user)
+
+        self.category = Category.objects.create(name="Bits")
+
+    def add(self, price, quantity=1):
+        product = Product.objects.create(
+            name=f"Item {price}",
+            description="x",
+            price=Decimal(price),
+            stock=50,
+            category=self.category,
+        )
+        return self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": product.pk, "quantity": quantity},
+            format="json",
+        ).json()
+
+    def test_an_empty_cart_is_not_charged_for_delivery(self):
+        body = self.client.get("/api/v1/cart/").json()
+
+        self.assertEqual(Decimal(body["shipping"]), Decimal("0.00"))
+        self.assertEqual(Decimal(body["total"]), Decimal("0.00"))
+        # "Spend 50.00 more" beside a delivery cost of 0.00 reads as a
+        # contradiction, so an empty cart quotes no gap either.
+        self.assertEqual(
+            Decimal(body["free_shipping_remaining"]), Decimal("0.00")
+        )
+
+    def test_a_small_order_pays_the_flat_fee(self):
+        body = self.add("20.00")
+
+        self.assertEqual(Decimal(body["subtotal"]), Decimal("20.00"))
+        self.assertEqual(Decimal(body["shipping"]), Decimal("9.90"))
+        self.assertEqual(Decimal(body["total"]), Decimal("29.90"))
+        self.assertEqual(
+            Decimal(body["free_shipping_remaining"]), Decimal("30.00")
+        )
+
+    def test_reaching_the_threshold_exactly_ships_free(self):
+        body = self.add("25.00", quantity=2)
+
+        self.assertEqual(Decimal(body["subtotal"]), Decimal("50.00"))
+        self.assertEqual(Decimal(body["shipping"]), Decimal("0.00"))
+        self.assertEqual(Decimal(body["total"]), Decimal("50.00"))
+        self.assertEqual(
+            Decimal(body["free_shipping_remaining"]), Decimal("0.00")
+        )
+
+    def test_going_over_the_threshold_still_ships_free(self):
+        body = self.add("120.00")
+
+        self.assertEqual(Decimal(body["shipping"]), Decimal("0.00"))
+        self.assertEqual(Decimal(body["total"]), Decimal("120.00"))
+
+    def test_the_threshold_travels_with_the_cart(self):
+        body = self.add("10.00")
+
+        # The client shows "spend X more" without knowing the rule.
+        self.assertEqual(body["free_shipping_threshold"], "50.00")
+
+
+class OrderApiTests(TestCase):
+    """Placing, paying for, shipping and cancelling an order."""
+
+    def setUp(self):
+        self.client = APIClient()
+        sellers, _ = Group.objects.get_or_create(name="Sellers")
+
+        self.seller_a = User.objects.create_user(
+            username="order-seller-a",
+            email="order-seller-a@example.com",
+            password="pw-for-tests-only",
+            store_name="Store A",
+        )
+        self.seller_b = User.objects.create_user(
+            username="order-seller-b",
+            email="order-seller-b@example.com",
+            password="pw-for-tests-only",
+            store_name="Store B",
+        )
+        self.seller_a.groups.add(sellers)
+        self.seller_b.groups.add(sellers)
+
+        self.shopper = User.objects.create_user(
+            username="order-shopper",
+            email="order-shopper@example.com",
+            password="pw-for-tests-only",
+        )
+
+        self.category = Category.objects.create(name="Order Things")
+        self.from_a = Product.objects.create(
+            name="Thing from A",
+            description="x",
+            price=Decimal("30.00"),
+            stock=5,
+            category=self.category,
+            seller=self.seller_a,
+        )
+        self.from_b = Product.objects.create(
+            name="Thing from B",
+            description="x",
+            price=Decimal("25.00"),
+            stock=2,
+            category=self.category,
+            seller=self.seller_b,
+        )
+
+        self.address = DeliveryAddress.objects.create(
+            user=self.shopper,
+            label="Home",
+            recipient_name="Test Shopper",
+            phone_number="+90 555 000 00 00",
+            address_line_1="Sokak 1",
+            district="Kadikoy",
+            city="Istanbul",
+            postal_code="34710",
+            is_default=True,
+        )
+        self.good_card = PaymentMethod.objects.create(
+            user=self.shopper,
+            brand="visa",
+            last4="4242",
+            exp_month=12,
+            exp_year=2038,
+            holder_name="TEST SHOPPER",
+            provider_token="tok_good",
+            is_default=True,
+        )
+        self.declined_card = PaymentMethod.objects.create(
+            user=self.shopper,
+            brand="visa",
+            last4="0002",
+            exp_month=12,
+            exp_year=2038,
+            holder_name="TEST SHOPPER",
+            provider_token="tok_declined",
+        )
+
+    # ── helpers ──────────────────────────────────────────────────────
+
+    def fill_cart(self):
+        self.client.force_authenticate(self.shopper)
+        self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": self.from_a.pk, "quantity": 1},
+            format="json",
+        )
+        self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": self.from_b.pk, "quantity": 1},
+            format="json",
+        )
+
+    def place(self, card=None, **extra):
+        return self.client.post(
+            "/api/v1/orders/",
+            {
+                "address_id": self.address.pk,
+                "payment_method_id": (card or self.good_card).pk,
+                **extra,
+            },
+            format="json",
+        )
+
+    # ── placing ──────────────────────────────────────────────────────
+
+    def test_a_paid_order_copies_the_cart_and_takes_the_stock(self):
+        self.fill_cart()
+
+        response = self.place()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["status"], "paid")
+        self.assertEqual(Decimal(body["total"]), Decimal("55.00"))
+        self.assertRegex(body["order_number"], r"^VD-\d{4}-\d{5}$")
+
+        self.from_a.refresh_from_db()
+        self.from_b.refresh_from_db()
+        self.assertEqual((self.from_a.stock, self.from_b.stock), (4, 1))
+
+        # The cart is spent.
+        self.assertEqual(self.client.get("/api/v1/cart/").json()["item_count"], 0)
+
+    def test_the_lines_are_copies_that_survive_the_product(self):
+        self.fill_cart()
+        self.place()
+
+        self.from_a.delete()
+
+        body = self.client.get("/api/v1/orders/").json()[0]
+        names = sorted(item["name"] for item in body["items"])
+        self.assertEqual(names, ["Thing from A", "Thing from B"])
+        line = next(i for i in body["items"] if i["name"] == "Thing from A")
+        self.assertEqual(Decimal(line["unit_price"]), Decimal("30.00"))
+        self.assertEqual(line["seller_name"], "Store A")
+
+    def test_a_price_change_does_not_reach_a_placed_order(self):
+        self.fill_cart()
+        self.place()
+
+        self.from_a.price = Decimal("999.00")
+        self.from_a.save(update_fields=["price"])
+
+        body = self.client.get("/api/v1/orders/").json()[0]
+        self.assertEqual(Decimal(body["total"]), Decimal("55.00"))
+
+    def test_the_address_is_copied_not_linked(self):
+        self.fill_cart()
+        self.place()
+        self.address.delete()
+
+        body = self.client.get("/api/v1/orders/").json()[0]
+        self.assertEqual(body["recipient_name"], "Test Shopper")
+        self.assertEqual(body["city"], "Istanbul")
+
+    def test_an_empty_cart_cannot_be_ordered(self):
+        self.client.force_authenticate(self.shopper)
+
+        response = self.place()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("empty", str(response.json()).lower())
+
+    # ── payment ──────────────────────────────────────────────────────
+
+    def test_a_declined_card_leaves_the_shop_untouched(self):
+        self.fill_cart()
+
+        response = self.place(card=self.declined_card)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("declined", str(response.json()).lower())
+
+        self.from_a.refresh_from_db()
+        self.from_b.refresh_from_db()
+        self.assertEqual((self.from_a.stock, self.from_b.stock), (5, 2))
+        self.assertEqual(self.client.get("/api/v1/cart/").json()["item_count"], 2)
+
+    def test_a_declined_order_is_kept_with_its_reason(self):
+        self.fill_cart()
+        self.place(card=self.declined_card)
+
+        # It has to survive the failure, or there is nothing to retry.
+        order = Order.objects.get(user=self.shopper)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(order.payments.count(), 1)
+        self.assertEqual(order.payments.first().status, Payment.Status.FAILED)
+
+        body = self.client.get(f"/api/v1/orders/{order.order_number}/").json()
+        self.assertEqual(body["last_payment_error"], "Your card was declined.")
+
+    def test_retrying_with_a_good_card_works(self):
+        self.fill_cart()
+        self.place(card=self.declined_card)
+
+        response = self.place()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["status"], "paid")
+
+    def test_an_expired_card_is_refused_before_charging(self):
+        self.fill_cart()
+        expired = PaymentMethod.objects.create(
+            user=self.shopper,
+            brand="visa",
+            last4="4242",
+            exp_month=1,
+            exp_year=2020,
+            holder_name="TEST SHOPPER",
+            provider_token="tok_expired",
+        )
+
+        response = self.place(card=expired)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Payment.objects.count(), 0)
+
+    def test_another_shoppers_card_cannot_be_used(self):
+        self.fill_cart()
+        stranger_card = PaymentMethod.objects.create(
+            user=self.seller_a,
+            brand="visa",
+            last4="4242",
+            exp_month=12,
+            exp_year=2038,
+            holder_name="SOMEONE ELSE",
+            provider_token="tok_stranger",
+        )
+
+        response = self.place(card=stranger_card)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── idempotency ──────────────────────────────────────────────────
+
+    def test_a_repeated_key_returns_the_same_order(self):
+        self.fill_cart()
+        first = self.place(idempotency_key="abc-123")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        second = self.place(idempotency_key="abc-123")
+
+        # Nothing was created, so it is not a 201.
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second.json()["order_number"], first.json()["order_number"]
+        )
+        self.assertEqual(Order.objects.filter(user=self.shopper).count(), 1)
+
+    def test_two_shoppers_may_send_the_same_key(self):
+        other = User.objects.create_user(
+            username="order-shopper-2",
+            email="order-shopper-2@example.com",
+            password="pw-for-tests-only",
+        )
+        DeliveryAddress.objects.create(
+            user=other,
+            label="Home",
+            recipient_name="Other",
+            phone_number="+90 555 111 11 11",
+            address_line_1="Sokak 2",
+            district="Besiktas",
+            city="Istanbul",
+        )
+        PaymentMethod.objects.create(
+            user=other,
+            brand="visa",
+            last4="4242",
+            exp_month=12,
+            exp_year=2038,
+            holder_name="OTHER",
+            provider_token="tok_other",
+        )
+
+        self.fill_cart()
+        self.place(idempotency_key="shared")
+
+        self.client.force_authenticate(other)
+        self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": self.from_a.pk, "quantity": 1},
+            format="json",
+        )
+        response = self.client.post(
+            "/api/v1/orders/",
+            {
+                "address_id": other.delivery_addresses.first().pk,
+                "payment_method_id": other.payment_methods.first().pk,
+                "idempotency_key": "shared",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # ── stock ────────────────────────────────────────────────────────
+
+    def test_an_order_is_refused_whole_when_one_line_ran_out(self):
+        self.fill_cart()
+        self.from_b.stock = 0
+        self.from_b.save(update_fields=["stock"])
+
+        response = self.place()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("only 0 left", str(response.json()))
+        # The line that was available is not taken either.
+        self.from_a.refresh_from_db()
+        self.assertEqual(self.from_a.stock, 5)
+
+    # ── shipping and delivery ────────────────────────────────────────
+
+    def test_the_order_ships_only_once_every_seller_has_posted(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        self.client.force_authenticate(self.seller_a)
+        self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.client.force_authenticate(self.shopper)
+        self.assertEqual(
+            self.client.get(f"/api/v1/orders/{number}/").json()["status"], "paid"
+        )
+
+        self.client.force_authenticate(self.seller_b)
+        self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.client.force_authenticate(self.shopper)
+        self.assertEqual(
+            self.client.get(f"/api/v1/orders/{number}/").json()["status"],
+            "shipped",
+        )
+
+    def test_a_seller_cannot_ship_twice(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        self.client.force_authenticate(self.seller_a)
+        self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+        again = self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delivery_can_only_be_confirmed_after_shipping(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        too_early = self.client.post(f"/api/v1/orders/{number}/delivered/")
+        self.assertEqual(too_early.status_code, status.HTTP_400_BAD_REQUEST)
+
+        for seller in (self.seller_a, self.seller_b):
+            self.client.force_authenticate(seller)
+            self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.client.force_authenticate(self.shopper)
+        done = self.client.post(f"/api/v1/orders/{number}/delivered/")
+
+        self.assertEqual(done.status_code, status.HTTP_200_OK)
+        self.assertEqual(done.json()["status"], "delivered")
+
+    # ── cancelling ───────────────────────────────────────────────────
+
+    def test_cancelling_puts_the_stock_back(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        response = self.client.post(f"/api/v1/orders/{number}/cancel/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["status"], "cancelled")
+        self.from_a.refresh_from_db()
+        self.from_b.refresh_from_db()
+        self.assertEqual((self.from_a.stock, self.from_b.stock), (5, 2))
+
+    def test_one_seller_shipping_closes_cancelling_for_the_whole_order(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        self.client.force_authenticate(self.seller_a)
+        self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.client.force_authenticate(self.shopper)
+        detail = self.client.get(f"/api/v1/orders/{number}/").json()
+        self.assertFalse(detail["is_cancellable"])
+
+        response = self.client.post(f"/api/v1/orders/{number}/cancel/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already been shipped", str(response.json()))
+
+    def test_cancelling_twice_is_refused(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+        self.client.post(f"/api/v1/orders/{number}/cancel/")
+
+        again = self.client.post(f"/api/v1/orders/{number}/cancel/")
+
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── who sees what ────────────────────────────────────────────────
+
+    def test_a_seller_sees_only_their_own_lines(self):
+        self.fill_cart()
+        self.place()
+
+        self.client.force_authenticate(self.seller_a)
+        rows = self.client.get("/api/v1/seller/orders/").json()
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual([i["name"] for i in rows[0]["items"]], ["Thing from A"])
+        self.assertEqual(Decimal(rows[0]["seller_total"]), Decimal("30.00"))
+
+    def test_a_seller_gets_the_address_but_not_the_customer_account(self):
+        self.fill_cart()
+        self.place()
+
+        self.client.force_authenticate(self.seller_a)
+        row = self.client.get("/api/v1/seller/orders/").json()[0]
+
+        # Enough to post a parcel...
+        self.assertEqual(row["recipient_name"], "Test Shopper")
+        self.assertEqual(row["city"], "Istanbul")
+        # ...and nothing about the account behind it.
+        self.assertNotIn("order-shopper@example.com", str(row))
+        self.assertNotIn("user", row)
+
+    def test_a_seller_cannot_open_the_customer_view_of_the_order(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        self.client.force_authenticate(self.seller_a)
+        response = self.client.get(f"/api/v1/orders/{number}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_seller_with_no_line_on_an_order_cannot_ship_it(self):
+        self.client.force_authenticate(self.shopper)
+        self.client.post(
+            "/api/v1/cart/items/",
+            {"product_id": self.from_a.pk, "quantity": 1},
+            format="json",
+        )
+        number = self.place().json()["order_number"]
+
+        self.client.force_authenticate(self.seller_b)
+        response = self.client.post(f"/api/v1/seller/orders/{number}/ship/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_orders_are_private_to_their_owner(self):
+        self.fill_cart()
+        number = self.place().json()["order_number"]
+
+        stranger = User.objects.create_user(
+            username="order-stranger",
+            email="order-stranger@example.com",
+            password="pw-for-tests-only",
+        )
+        self.client.force_authenticate(stranger)
+
+        self.assertEqual(
+            self.client.get(f"/api/v1/orders/{number}/").status_code, 404
+        )
+        self.assertEqual(self.client.get("/api/v1/orders/").json(), [])
+
+    def test_signing_out_hides_orders(self):
+        self.fill_cart()
+        self.place()
+        self.client.force_authenticate(None)
+
+        self.assertEqual(self.client.get("/api/v1/orders/").status_code, 401)
+
+
+class FakePaymentProviderTests(TestCase):
+    """The stand-in provider, so its behaviour is pinned down."""
+
+    def test_an_ordinary_card_succeeds(self):
+        result = charge(amount=Decimal("10.00"), brand="visa", last4="4242")
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.reference.startswith("pay_"))
+        self.assertEqual(result.failure_reason, "")
+
+    def test_the_published_test_cards_fail_the_same_way_every_time(self):
+        for last4, expected in (
+            ("0002", "declined"),
+            ("9995", "insufficient funds"),
+            ("9987", "lost or stolen"),
+        ):
+            with self.subTest(last4=last4):
+                first = charge(amount=Decimal("10.00"), brand="visa", last4=last4)
+                second = charge(amount=Decimal("10.00"), brand="visa", last4=last4)
+
+                self.assertFalse(first.succeeded)
+                self.assertFalse(second.succeeded)
+                self.assertIn(expected, first.failure_reason.lower())
+
+    def test_nothing_to_charge_is_a_failure(self):
+        result = charge(amount=Decimal("0.00"), brand="visa", last4="4242")
+
+        self.assertFalse(result.succeeded)

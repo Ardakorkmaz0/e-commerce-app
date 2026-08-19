@@ -3,11 +3,15 @@ import re
 from rest_framework import serializers
 
 from ..models import (
+    FREE_SHIPPING_THRESHOLD,
     Attribute,
     AttributeValue,
     Cart,
     CartItem,
     Category,
+    Order,
+    OrderItem,
+    Payment,
     Product,
     ProductImage,
     ProductVariant,
@@ -471,10 +475,36 @@ class CartSerializer(serializers.ModelSerializer):
     )
     has_stock_issues = serializers.SerializerMethodField()
 
+    # Money is computed on the server, so the checkout screen displays
+    # these rather than adding anything up itself.
+    shipping = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    free_shipping_remaining = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    free_shipping_threshold = serializers.SerializerMethodField()
+
     class Meta:
         model = Cart
-        fields = ("id", "items", "item_count", "subtotal", "has_stock_issues")
+        fields = (
+            "id",
+            "items",
+            "item_count",
+            "subtotal",
+            "shipping",
+            "total",
+            "free_shipping_remaining",
+            "free_shipping_threshold",
+            "has_stock_issues",
+        )
         read_only_fields = fields
+
+    def get_free_shipping_threshold(self, obj):
+        return str(FREE_SHIPPING_THRESHOLD)
 
     def get_has_stock_issues(self, obj):
         # Checkout will need to block on this, so the flag is computed once
@@ -649,3 +679,168 @@ class SellerOptionSerializer(serializers.Serializer):
                 {"attribute_name": ["Say which option group this belongs to."]}
             )
         return attrs
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    """
+    A line as it was bought.
+
+    Every field is the copy taken at checkout, so a product that has since
+    been renamed, repriced or deleted still reads the way the shopper
+    remembers it. `slug` is the one exception a client may act on: it can
+    only be used to try a link, which simply 404s if the product is gone.
+    """
+
+    is_shipped = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "option_label",
+            "seller_name",
+            "image_url",
+            "unit_price",
+            "quantity",
+            "line_total",
+            "is_shipped",
+            "shipped_at",
+        )
+        read_only_fields = fields
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    """The shopper's own view of an order."""
+
+    items = OrderItemSerializer(many=True, read_only=True)
+    item_count = serializers.IntegerField(read_only=True)
+    status_display = serializers.CharField(
+        source="get_status_display", read_only=True
+    )
+    is_cancellable = serializers.BooleanField(read_only=True)
+    last_payment_error = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = (
+            "id",
+            "order_number",
+            "status",
+            "status_display",
+            "currency",
+            "subtotal",
+            "shipping",
+            "total",
+            "item_count",
+            "items",
+            "recipient_name",
+            "phone_number",
+            "address_line_1",
+            "address_line_2",
+            "district",
+            "city",
+            "postal_code",
+            "country_code",
+            "card_brand",
+            "card_last4",
+            "is_cancellable",
+            "last_payment_error",
+            "created_at",
+            "paid_at",
+            "shipped_at",
+            "delivered_at",
+            "cancelled_at",
+        )
+        read_only_fields = fields
+
+    def get_last_payment_error(self, obj):
+        """
+        Why an order is still unpaid, so the screen can offer a retry.
+
+        Only the most recent attempt matters; earlier ones are kept in the
+        table but would only clutter the page.
+        """
+        if obj.status != Order.Status.PENDING:
+            return ""
+        attempt = obj.payments.filter(status=Payment.Status.FAILED).first()
+        return attempt.failure_reason if attempt else ""
+
+
+class SellerOrderItemSerializer(serializers.ModelSerializer):
+    """A line as its seller sees it."""
+
+    class Meta:
+        model = OrderItem
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "option_label",
+            "image_url",
+            "unit_price",
+            "quantity",
+            "line_total",
+            "shipped_at",
+        )
+        read_only_fields = fields
+
+
+class SellerOrderSerializer(serializers.ModelSerializer):
+    """
+    An order narrowed to one seller.
+
+    Only what is needed to pack and post a parcel: this seller's lines,
+    the name to write on it and where to send it. The customer's account,
+    their other orders and their other addresses stay out of reach, which
+    is the same rule the rest of the seller panel follows.
+    """
+
+    items = serializers.SerializerMethodField()
+    seller_total = serializers.SerializerMethodField()
+    status_display = serializers.CharField(
+        source="get_status_display", read_only=True
+    )
+
+    class Meta:
+        model = Order
+        fields = (
+            "id",
+            "order_number",
+            "status",
+            "status_display",
+            "currency",
+            "items",
+            "seller_total",
+            "recipient_name",
+            "phone_number",
+            "address_line_1",
+            "address_line_2",
+            "district",
+            "city",
+            "postal_code",
+            "country_code",
+            "created_at",
+            "paid_at",
+        )
+        read_only_fields = fields
+
+    def _lines(self, obj):
+        seller = self.context["seller"]
+        return [item for item in obj.items.all() if item.seller_id == seller.pk]
+
+    def get_items(self, obj):
+        return SellerOrderItemSerializer(self._lines(obj), many=True).data
+
+    def get_seller_total(self, obj):
+        return str(sum(item.line_total for item in self._lines(obj)))
+
+
+class PlaceOrderSerializer(serializers.Serializer):
+    address_id = serializers.IntegerField()
+    payment_method_id = serializers.IntegerField()
+    #: Optional, but without it a refresh opens a second order.
+    idempotency_key = serializers.CharField(
+        required=False, allow_blank=True, max_length=64
+    )

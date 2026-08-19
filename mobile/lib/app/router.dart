@@ -5,6 +5,10 @@ import 'package:ecommerce_mobile/features/auth/presentation/edit_profile_screen.
 import 'package:ecommerce_mobile/features/auth/presentation/sign_in_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/sign_up_screen.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/splash_screen.dart';
+import 'package:ecommerce_mobile/features/checkout/presentation/checkout_screen.dart';
+import 'package:ecommerce_mobile/features/orders/presentation/order_detail_screen.dart';
+import 'package:ecommerce_mobile/features/orders/presentation/orders_screen.dart';
+import 'package:ecommerce_mobile/features/orders/presentation/seller_orders_screen.dart';
 import 'package:ecommerce_mobile/features/main/presentation/main_screen.dart';
 import 'package:ecommerce_mobile/features/payments/presentation/add_card_screen.dart';
 import 'package:ecommerce_mobile/features/payments/presentation/payment_methods_screen.dart';
@@ -83,6 +87,33 @@ final GoRouter appRouter = GoRouter(
 
     // Seller panel. Declared before /seller/:slug/edit so the literal
     // "new" segment is not swallowed by the parameter route.
+    GoRoute(
+      path: '/checkout',
+      name: 'checkout',
+      builder: (context, state) => const CheckoutScreen(),
+    ),
+
+    GoRoute(
+      path: '/myorders',
+      name: 'orders',
+      builder: (context, state) => const OrdersScreen(),
+    ),
+    GoRoute(
+      path: '/myorders/:number',
+      name: 'orderDetail',
+      builder: (context, state) => OrderDetailScreen(
+        orderNumber: state.pathParameters['number']!,
+        justPlaced: state.uri.queryParameters['placed'] == '1',
+      ),
+    ),
+
+    // Declared before /seller/:slug/edit so the literal "orders" segment
+    // is not swallowed by the parameter route.
+    GoRoute(
+      path: '/seller/orders',
+      name: 'sellerOrders',
+      builder: (context, state) => const SellerOrdersScreen(),
+    ),
     GoRoute(
       path: '/seller',
       name: 'sellerProducts',

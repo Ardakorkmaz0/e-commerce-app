@@ -9,8 +9,14 @@ from .views import (
     FacetListView,
     ProductDetailView,
     ProductListView,
+    SellerOrderListView,
+    SellerOrderShipView,
     SellerRatingView,
     SellerProductDetailView,
+    OrderCancelView,
+    OrderDeliveredView,
+    OrderDetailView,
+    OrderListCreateView,
     SellerImageDetailView,
     SellerImageListCreateView,
     SellerOptionCreateView,
@@ -43,7 +49,30 @@ urlpatterns = [
         SellerRatingView.as_view(),
         name="seller_rating",
     ),
+    # Orders
+    path("orders/", OrderListCreateView.as_view(), name="orders"),
+    path(
+        "orders/<str:order_number>/",
+        OrderDetailView.as_view(),
+        name="order_detail",
+    ),
+    path(
+        "orders/<str:order_number>/cancel/",
+        OrderCancelView.as_view(),
+        name="order_cancel",
+    ),
+    path(
+        "orders/<str:order_number>/delivered/",
+        OrderDeliveredView.as_view(),
+        name="order_delivered",
+    ),
     # Seller panel (JWT + Sellers group)
+    path("seller/orders/", SellerOrderListView.as_view(), name="seller_orders"),
+    path(
+        "seller/orders/<str:order_number>/ship/",
+        SellerOrderShipView.as_view(),
+        name="seller_order_ship",
+    ),
     path(
         "seller/products/",
         SellerProductListCreateView.as_view(),

@@ -352,7 +352,7 @@ class _CartSummary extends StatelessWidget {
                 const Text('Subtotal', style: TextStyle(color: AppColors.mutedText)),
                 const SizedBox(width: 8),
                 Text(
-                  formatMoney(cart.subtotal),
+                  formatMoney(cart.total),
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontSize: 20,
@@ -361,11 +361,20 @@ class _CartSummary extends StatelessWidget {
                 ),
               ],
             ),
+            if (!cart.shipsFree)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'Includes ${formatMoney(cart.shipping)} delivery. Spend '
+                  '${formatMoney(cart.freeShippingRemaining)} more to get it '
+                  'free.',
+                  style: TextStyle(color: context.mutedText, fontSize: 11),
+                ),
+              ),
             const SizedBox(height: 12),
-            // TODO: enable once orders and the fake payment flow exist.
-            const GradientButton(
-              label: 'Checkout (coming soon)',
-              onPressed: null,
+            GradientButton(
+              label: 'Proceed to checkout',
+              onPressed: () => context.pushNamed('checkout'),
             ),
           ],
         ),

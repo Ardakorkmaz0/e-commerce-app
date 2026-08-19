@@ -41,6 +41,9 @@ export default async function SellerPage() {
           </p>
         </div>
         <div className="d-flex gap-2">
+          <Link className="btn btn-outline-secondary" href="/seller/orders">
+            Orders
+          </Link>
           <Link className="btn btn-outline-secondary" href="/profile/edit">
             Edit store profile
           </Link>

@@ -1,5 +1,6 @@
 """Create a repeatable demo catalog for local development."""
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -899,9 +900,154 @@ class Command(BaseCommand):
                 )
                 rating_count += 1
 
+
+        order_count = self._seed_orders(customers)
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Catalog ready: {created_count} created, {updated_count} updated, "
-                f"{rating_count} seller ratings ready."
+                f"{rating_count} seller ratings ready, {order_count} demo orders."
             )
         )
+
+    #: One demo order per state, so every screen has something to show on
+    #: a fresh clone: the list, the detail, the seller's shipping queue.
+    DEMO_ORDERS = (
+        {
+            "customer": "customer-01",
+            "state": "delivered",
+            "lines": (("clean-code", 1), ("the-pragmatic-programmer", 2)),
+        },
+        {
+            "customer": "customer-01",
+            "state": "shipped",
+            "lines": (("wireless-headphones", 1),),
+        },
+        {
+            "customer": "customer-02",
+            "state": "paid",
+            "lines": (("mechanical-keyboard", 1), ("usb-c-hub", 1)),
+        },
+        {
+            "customer": "customer-03",
+            "state": "cancelled",
+            "lines": (("smart-watch", 1),),
+        },
+    )
+
+    def _seed_orders(self, customers):
+        """
+        Builds the demo orders directly rather than through the checkout.
+
+        Going through place_order would charge cards these demo accounts do
+        not have and would eat real stock; these are records of things that
+        already happened, so they are written as such.
+        """
+        from decimal import Decimal
+
+        from django.utils import timezone
+
+        from ecommerce.models import (
+            FREE_SHIPPING_THRESHOLD,
+            SHIPPING_FEE,
+            Order,
+            OrderItem,
+            Payment,
+            Product,
+        )
+
+        made = 0
+        now = timezone.now()
+
+        for index, definition in enumerate(self.DEMO_ORDERS):
+            customer = customers[definition["customer"]]
+            key = f"seed-{definition['customer']}-{index}"
+
+            # Re-running the seeder must not pile up duplicates.
+            if Order.objects.filter(
+                user=customer, idempotency_key=key
+            ).exists():
+                continue
+
+            products = []
+            for slug, quantity in definition["lines"]:
+                product = Product.objects.filter(slug=slug).first()
+                if product is not None:
+                    products.append((product, quantity))
+            if not products:
+                continue
+
+            subtotal = sum(
+                (product.price * quantity for product, quantity in products),
+                Decimal("0.00"),
+            )
+            shipping = (
+                Decimal("0.00")
+                if subtotal >= FREE_SHIPPING_THRESHOLD
+                else SHIPPING_FEE
+            )
+            placed = now - timedelta(days=len(self.DEMO_ORDERS) - index + 1)
+
+            order = Order.objects.create(
+                user=customer,
+                status=Order.Status.PAID,
+                subtotal=subtotal,
+                shipping=shipping,
+                total=subtotal + shipping,
+                recipient_name=customer.username.replace("_", " ").title(),
+                phone_number="+90 555 000 00 0" + str(index),
+                address_line_1=f"Demo Sokak No {index + 1}",
+                district="Kadikoy",
+                city="Istanbul",
+                postal_code="34710",
+                card_brand="visa",
+                card_last4="4242",
+                idempotency_key=key,
+                paid_at=placed,
+            )
+
+            for product, quantity in products:
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    seller=product.seller,
+                    name=product.name,
+                    slug=product.slug,
+                    seller_name=(
+                        getattr(product.seller, "store_name", "")
+                        or getattr(product.seller, "username", "")
+                        if product.seller
+                        else ""
+                    ),
+                    image_url=product.image_url,
+                    unit_price=product.price,
+                    quantity=quantity,
+                    line_total=product.price * quantity,
+                )
+
+            Payment.objects.create(
+                order=order,
+                status=Payment.Status.SUCCEEDED,
+                amount=order.total,
+                card_brand="visa",
+                card_last4="4242",
+                reference=f"pay_seed{index:06d}",
+            )
+
+            state = definition["state"]
+            if state in {"shipped", "delivered"}:
+                shipped_at = placed + timedelta(days=1)
+                order.items.update(shipped_at=shipped_at)
+                order.status = Order.Status.SHIPPED
+                order.shipped_at = shipped_at
+            if state == "delivered":
+                order.status = Order.Status.DELIVERED
+                order.delivered_at = placed + timedelta(days=3)
+            if state == "cancelled":
+                order.status = Order.Status.CANCELLED
+                order.cancelled_at = placed + timedelta(hours=6)
+
+            order.save()
+            made += 1
+
+        return made

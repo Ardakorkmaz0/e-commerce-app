@@ -23,7 +23,13 @@ export type Cart = {
   id: number;
   items: CartItem[];
   item_count: number;
+  /** Every amount is a decimal string, computed by the server. */
   subtotal: string;
+  shipping: string;
+  total: string;
+  /** "0.00" once delivery is free. */
+  free_shipping_remaining: string;
+  free_shipping_threshold: string;
   has_stock_issues: boolean;
 };
 
@@ -32,6 +38,10 @@ const EMPTY_CART: Cart = {
   items: [],
   item_count: 0,
   subtotal: "0.00",
+  shipping: "0.00",
+  total: "0.00",
+  free_shipping_remaining: "0.00",
+  free_shipping_threshold: "0.00",
   has_stock_issues: false,
 };
 

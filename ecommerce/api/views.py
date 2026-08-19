@@ -11,10 +11,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import DeliveryAddress, PaymentMethod
+
 from ..models import (
     Attribute,
     AttributeValue,
     Category,
+    Order,
     Product,
     ProductImage,
     ProductVariant,
@@ -22,9 +25,14 @@ from ..models import (
 )
 from ..services import (
     CartError,
+    OrderError,
     add_to_cart,
+    cancel_order,
     clear_cart,
     get_or_create_cart,
+    mark_delivered,
+    mark_seller_lines_shipped,
+    place_order,
     remove_cart_item,
     set_cart_item_quantity,
 )
@@ -35,7 +43,10 @@ from .serializers import (
     AttributeSerializer,
     CartSerializer,
     CategorySerializer,
+    OrderSerializer,
+    PlaceOrderSerializer,
     ProductSerializer,
+    SellerOrderSerializer,
     SellerRatingInputSerializer,
     SellerOptionSerializer,
     SellerProductImageSerializer,
@@ -813,3 +824,179 @@ class CartItemDetailView(APIView):
         return Response(
             CartSerializer(cart, context={"request": request}).data
         )
+
+
+# ── Orders ───────────────────────────────────────────────────────────
+# An order is a copy of what the shopper agreed to, so none of these
+# views read prices or names from the catalog.
+
+
+def _order_queryset(user):
+    return (
+        Order.objects.filter(user=user)
+        .prefetch_related("items", "payments")
+        .order_by("-created_at", "-id")
+    )
+
+
+class OrderListCreateView(APIView):
+    """
+    GET  /api/v1/orders/   the shopper's own orders
+    POST /api/v1/orders/   turn the cart into one and charge the card
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = _order_queryset(request.user)
+        return Response(
+            OrderSerializer(orders, many=True, context={"request": request}).data
+        )
+
+    def post(self, request):
+        serializer = PlaceOrderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        address = DeliveryAddress.objects.filter(
+            pk=data["address_id"], user=request.user
+        ).first()
+        if address is None:
+            raise ValidationError({"address_id": ["Choose one of your addresses."]})
+
+        card = PaymentMethod.objects.filter(
+            pk=data["payment_method_id"], user=request.user
+        ).first()
+        if card is None:
+            raise ValidationError(
+                {"payment_method_id": ["Choose one of your saved cards."]}
+            )
+        if card.is_expired:
+            raise ValidationError(
+                {"payment_method_id": ["That card has expired."]}
+            )
+
+        try:
+            order, created = place_order(
+                user=request.user,
+                address=address,
+                payment_method=card,
+                idempotency_key=data.get("idempotency_key", ""),
+            )
+        except OrderError as error:
+            # The message is written for the shopper, so it goes straight
+            # through rather than being replaced with something generic.
+            raise ValidationError({"detail": [str(error)]})
+
+        # A repeat of the same key created nothing, so it is not a 201.
+        return Response(
+            OrderSerializer(order, context={"request": request}).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class OrderDetailView(APIView):
+    """GET /api/v1/orders/<order_number>/"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_order(self, request, order_number):
+        # Filtered by owner, so somebody else's number simply 404s.
+        return get_object_or_404(
+            _order_queryset(request.user), order_number=order_number
+        )
+
+    def get(self, request, order_number):
+        order = self.get_order(request, order_number)
+        return Response(
+            OrderSerializer(order, context={"request": request}).data
+        )
+
+
+class OrderCancelView(OrderDetailView):
+    """POST /api/v1/orders/<order_number>/cancel/"""
+
+    def post(self, request, order_number):
+        order = self.get_order(request, order_number)
+        try:
+            order = cancel_order(user=request.user, order=order)
+        except OrderError as error:
+            raise ValidationError({"detail": [str(error)]})
+
+        return Response(
+            OrderSerializer(order, context={"request": request}).data
+        )
+
+
+class OrderDeliveredView(OrderDetailView):
+    """POST /api/v1/orders/<order_number>/delivered/"""
+
+    def post(self, request, order_number):
+        order = self.get_order(request, order_number)
+        try:
+            order = mark_delivered(user=request.user, order=order)
+        except OrderError as error:
+            raise ValidationError({"detail": [str(error)]})
+
+        return Response(
+            OrderSerializer(order, context={"request": request}).data
+        )
+
+
+class SellerOrderListView(APIView):
+    """
+    GET /api/v1/seller/orders/
+
+    Orders that contain something this seller sold, narrowed to their own
+    lines. Unpaid ones are left out: nothing to pack until it is paid for.
+    """
+
+    permission_classes = [IsSeller]
+
+    def get(self, request):
+        orders = (
+            Order.objects.filter(
+                items__seller=request.user,
+                status__in=[
+                    Order.Status.PAID,
+                    Order.Status.SHIPPED,
+                    Order.Status.DELIVERED,
+                    Order.Status.CANCELLED,
+                ],
+            )
+            .distinct()
+            .prefetch_related("items")
+            .order_by("-created_at", "-id")
+        )
+        return Response(
+            SellerOrderSerializer(
+                orders,
+                many=True,
+                context={"request": request, "seller": request.user},
+            ).data
+        )
+
+
+class SellerOrderShipView(APIView):
+    """POST /api/v1/seller/orders/<order_number>/ship/"""
+
+    permission_classes = [IsSeller]
+
+    def post(self, request, order_number):
+        order = get_object_or_404(
+            Order.objects.filter(items__seller=request.user).distinct(),
+            order_number=order_number,
+        )
+
+        try:
+            order = mark_seller_lines_shipped(seller=request.user, order=order)
+        except OrderError as error:
+            raise ValidationError({"detail": [str(error)]})
+
+        return Response(
+            SellerOrderSerializer(
+                order, context={"request": request, "seller": request.user}
+            ).data
+        )
+
+

@@ -123,26 +123,39 @@ export default async function CartPage() {
               <span>Subtotal</span>
               <span>{formatPrice(cart.subtotal)}</span>
             </div>
-            <div className="cart-summary-row muted">
+            <div className="cart-summary-row">
               <span>Delivery</span>
-              <span>Calculated at checkout</span>
+              <span
+                className={
+                  Number(cart.shipping) === 0 ? "checkout-free" : undefined
+                }
+              >
+                {Number(cart.shipping) === 0
+                  ? "Free"
+                  : formatPrice(cart.shipping)}
+              </span>
             </div>
+
+            {Number(cart.free_shipping_remaining) > 0 ? (
+              <p className="checkout-nudge mb-0">
+                Spend {formatPrice(cart.free_shipping_remaining)} more for free
+                delivery.
+              </p>
+            ) : null}
 
             <hr />
 
             <div className="cart-summary-row total">
               <span>Total</span>
-              <span>{formatPrice(cart.subtotal)}</span>
+              <span>{formatPrice(cart.total)}</span>
             </div>
 
-            {/* TODO: enable once orders and the fake payment flow exist. */}
-            <button
+            <Link
               className="btn signin-submit-button w-100 py-2 mt-3"
-              type="button"
-              disabled
+              href="/checkout"
             >
-              Checkout (coming soon)
-            </button>
+              Proceed to checkout
+            </Link>
 
             <Link className="btn btn-link w-100 mt-1" href="/products">
               Continue shopping

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -297,6 +298,234 @@ class ProductVariant(models.Model):
         return self.stock > 0
 
 
+class Order(models.Model):
+    """
+    What a shopper agreed to pay, frozen at the moment they agreed.
+
+    Nothing here follows the catalog. Prices, names, the address and the
+    card are all copies, so a seller raising a price or a customer deleting
+    an address cannot rewrite history. The live rows are still linked where
+    they exist, but only so the screens can offer a "view product" link.
+
+    One order may hold lines from several sellers. Shipping is tracked per
+    line, because each seller posts their own parcel; the order's own
+    status is the shopper's view of the whole thing.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting payment"
+        PAID = "paid", "Paid"
+        SHIPPED = "shipped", "Shipped"
+        DELIVERED = "delivered", "Delivered"
+        CANCELLED = "cancelled", "Cancelled"
+
+    order_number = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="VD-2026-00001, filled in once the row has an id.",
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="orders",
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    # ── Money, all frozen ─────────────────────────────────────────────
+    currency = models.CharField(max_length=3, default="USD")
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+    shipping = models.DecimalField(max_digits=12, decimal_places=2)
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # ── Where it goes, copied from the address book ───────────────────
+    # Deleting a saved address must not blank out an old order, so none of
+    # this is a foreign key.
+    recipient_name = models.CharField(max_length=120)
+    phone_number = models.CharField(max_length=32)
+    address_line_1 = models.CharField(max_length=200)
+    address_line_2 = models.CharField(max_length=200, blank=True)
+    district = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20, blank=True)
+    country_code = models.CharField(max_length=2, default="TR")
+
+    # ── How it was paid ───────────────────────────────────────────────
+    # Brand and last four only, exactly as everywhere else in this project.
+    card_brand = models.CharField(max_length=20, blank=True)
+    card_last4 = models.CharField(max_length=4, blank=True)
+
+    #: Sent by the client so that a refresh on the payment screen returns
+    #: the order that was already placed instead of opening a second one.
+    idempotency_key = models.CharField(max_length=64, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [
+            # Scoped to the user: two shoppers may well send the same key.
+            models.UniqueConstraint(
+                fields=("user", "idempotency_key"),
+                condition=~Q(idempotency_key=""),
+                name="uniq_order_idempotency_key_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return self.order_number or f"Order {self.pk}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        # The number needs the id, so it is written on the way back out.
+        # Left null until then, which Postgres allows past a unique index.
+        if not self.order_number:
+            year = (self.created_at or timezone.now()).year
+            self.order_number = f"VD-{year}-{self.pk:05d}"
+            super().save(update_fields=["order_number"])
+
+    @property
+    def item_count(self):
+        return sum(item.quantity for item in self.items.all())
+
+    @property
+    def is_cancellable(self):
+        """
+        Only before anything leaves a warehouse.
+
+        Cancelling is all or nothing, so one seller posting their parcel
+        closes it for the whole order. The screens say so out loud rather
+        than showing a dead button.
+        """
+        if self.status not in {self.Status.PAID}:
+            return False
+        return not self.items.filter(shipped_at__isnull=False).exists()
+
+    def refresh_shipping_status(self):
+        """
+        Pulls the order's own status up from its lines.
+
+        Sellers mark their own lines, so the order becomes "shipped" only
+        once every line has gone out.
+        """
+        if self.status not in {self.Status.PAID, self.Status.SHIPPED}:
+            return
+
+        lines = list(self.items.all())
+        if lines and all(line.shipped_at is not None for line in lines):
+            if self.status != self.Status.SHIPPED:
+                self.status = self.Status.SHIPPED
+                self.shipped_at = timezone.now()
+                self.save(update_fields=["status", "shipped_at"])
+
+
+class OrderItem(models.Model):
+    """
+    One line, copied out of the cart.
+
+    `product`, `variant` and `seller` are kept as nullable links purely so
+    the screens can offer "view this product". Everything shown comes from
+    the copied columns, which is why a deleted product still reads right.
+    """
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_items",
+    )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_items",
+    )
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sold_items",
+    )
+
+    # ── The copy ──────────────────────────────────────────────────────
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220, blank=True)
+    option_label = models.CharField(max_length=200, blank=True)
+    seller_name = models.CharField(max_length=150, blank=True)
+    image_url = models.URLField(blank=True, max_length=500)
+
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField()
+    line_total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    #: Set by the seller when their parcel goes out.
+    shipped_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("id",)
+
+    def __str__(self):
+        return f"{self.name} x{self.quantity}"
+
+    @property
+    def is_shipped(self):
+        return self.shipped_at is not None
+
+
+class Payment(models.Model):
+    """
+    One attempt at paying for an order.
+
+    Failed attempts are kept: "the card was declined twice, then a
+    different one worked" is worth being able to see, and deleting the
+    evidence would leave a paid order with no explanation.
+    """
+
+    class Status(models.TextChoices):
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="payments",
+    )
+    status = models.CharField(max_length=10, choices=Status.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default="USD")
+
+    card_brand = models.CharField(max_length=20, blank=True)
+    card_last4 = models.CharField(max_length=4, blank=True)
+
+    #: What the fake provider called this attempt, e.g. "pay_3f9a1c".
+    reference = models.CharField(max_length=64, blank=True)
+    failure_reason = models.CharField(max_length=200, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self):
+        return f"{self.get_status_display()} {self.amount} {self.currency}"
+
+
 class ProductImage(models.Model):
     """
     One extra photo in a product's gallery.
@@ -392,6 +621,11 @@ class SellerRating(models.Model):
         return f"{self.customer} -> {self.seller}: {self.score}"
 
 
+#: Orders at or above this go out free; below it they carry SHIPPING_FEE.
+FREE_SHIPPING_THRESHOLD = Decimal("50.00")
+SHIPPING_FEE = Decimal("9.90")
+
+
 class Cart(models.Model):
     """
     One open cart per shopper.
@@ -423,6 +657,34 @@ class Cart(models.Model):
             (item.line_total for item in self.items.all()),
             Decimal("0.00"),
         )
+
+    # Shipping is worked out here rather than in the client so that the
+    # number the shopper is shown is the number the server would charge.
+
+    @property
+    def shipping(self):
+        if not self.items.all():
+            return Decimal("0.00")
+        if self.subtotal >= FREE_SHIPPING_THRESHOLD:
+            return Decimal("0.00")
+        return SHIPPING_FEE
+
+    @property
+    def total(self):
+        return self.subtotal + self.shipping
+
+    @property
+    def free_shipping_remaining(self):
+        """
+        How much more is needed for free delivery; zero once it is.
+
+        Also zero for an empty cart, which is charged nothing anyway —
+        quoting a gap next to a shipping cost of 0.00 contradicts itself.
+        """
+        if not self.items.all():
+            return Decimal("0.00")
+        missing = FREE_SHIPPING_THRESHOLD - self.subtotal
+        return missing if missing > 0 else Decimal("0.00")
 
 
 class CartItem(models.Model):

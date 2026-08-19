@@ -30,6 +30,13 @@ class SellerProductsScreen extends ConsumerWidget {
           'My Products',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Orders',
+            icon: const Icon(Icons.receipt_long_outlined),
+            onPressed: () => context.pushNamed('sellerOrders'),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.pushNamed('sellerProductNew'),

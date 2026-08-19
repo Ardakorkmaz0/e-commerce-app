@@ -36,7 +36,7 @@ class ProfileTab extends ConsumerWidget {
                 leading: const Icon(Icons.receipt_long_outlined),
                 title: const Text('My Orders'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {}, // TODO: navigate to orders page
+                onTap: () => context.pushNamed('orders'),
               ),
               ListTile(
                 leading: const Icon(Icons.person_outline),
