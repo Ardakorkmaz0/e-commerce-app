@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { authorizedFetch } from "@/lib/auth";
+import { safeNext } from "@/lib/safe-next";
 
 export type AddressFormState = {
   errors: Record<string, string[]>;
@@ -172,7 +173,12 @@ export async function createAddress(
     return errorState;
   }
 
-  redirect("/profile/addresses");
+  // Somebody sent here from checkout wants to carry on checking out, not
+  // to land in their address book.
+  const next = formData.get("next");
+  redirect(
+    safeNext(typeof next === "string" ? next : null) ?? "/profile/addresses",
+  );
 }
 
 export async function updateAddress(

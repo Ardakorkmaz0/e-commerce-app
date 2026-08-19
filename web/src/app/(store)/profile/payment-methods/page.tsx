@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CardBrandLogo } from "@/components/card-brand-logo";
 import { getCurrentUser } from "@/lib/auth";
 import { fetchPaymentMethods, formatExpiry } from "@/lib/payments";
+import { safeNext } from "@/lib/safe-next";
 
 import { AddCardForm } from "./add-card-form";
 import { deletePaymentMethod, selectPaymentMethod } from "./actions";
@@ -12,17 +14,32 @@ export const metadata: Metadata = {
   title: "Payment methods",
 };
 
-export default async function PaymentMethodsPage() {
+type PaymentMethodsPageProps = {
+  searchParams: Promise<{ next?: string }>;
+};
+
+export default async function PaymentMethodsPage({
+  searchParams,
+}: PaymentMethodsPageProps) {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/signin");
   }
 
+  const { next } = await searchParams;
+  const returnTo = safeNext(next);
   const methods = await fetchPaymentMethods();
 
   return (
     <main className="container py-4" style={{ maxWidth: "720px" }}>
       <h1 className="section-title mb-3">Payment methods</h1>
+
+      {/* A way out that does not need a card saved first. */}
+      {returnTo === "/checkout" ? (
+        <p className="checkout-nudge mb-3">
+          Saving a card takes you back to <Link href="/checkout">checkout</Link>.
+        </p>
+      ) : null}
 
       <div className="profile-card p-4 mb-4">
         <h2 className="h6 mb-3">Saved cards</h2>
@@ -76,7 +93,7 @@ export default async function PaymentMethodsPage() {
 
       <div className="profile-card p-4">
         <h2 className="h6 mb-3">Add a card</h2>
-        <AddCardForm />
+        <AddCardForm next={returnTo ?? undefined} />
 
         <p className="payment-security-note mt-3 mb-0">
           <svg

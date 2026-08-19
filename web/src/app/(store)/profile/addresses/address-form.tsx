@@ -35,14 +35,19 @@ function FieldError({ errors }: FieldErrorProps) {
 
 type AddressFormProps = {
   address?: Address;
+  /** Where to go once saved — set when checkout sent the shopper here. */
+  next?: string;
 };
 
-export function AddressForm({ address }: AddressFormProps) {
+export function AddressForm({ address, next }: AddressFormProps) {
   const action = address ? updateAddress.bind(null, address.id) : createAddress;
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
     <form action={formAction} className="address-form">
+      {/* Where to go once this is saved; validated on the server. */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
+
       {state.message ? (
         <div className="alert alert-danger" role="alert" aria-live="polite">
           {state.message}

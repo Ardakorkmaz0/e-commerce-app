@@ -98,7 +98,7 @@ export function CheckoutForm({ cart, addresses, cards }: CheckoutFormProps) {
             ) : (
               <p className="checkout-empty">
                 You have no saved addresses.{" "}
-                <Link href="/profile/addresses/new">Add one</Link> to continue.
+                <Link href="/profile/addresses/new?next=/checkout">Add one</Link> to continue.
               </p>
             )}
 
@@ -160,7 +160,7 @@ export function CheckoutForm({ cart, addresses, cards }: CheckoutFormProps) {
                 {cards.length
                   ? "Every saved card has expired. "
                   : "You have no saved cards. "}
-                <Link href="/profile/payment-methods">Add a card</Link> to
+                <Link href="/profile/payment-methods?next=/checkout">Add a card</Link> to
                 continue.
               </p>
             )}

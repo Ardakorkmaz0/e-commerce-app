@@ -33,7 +33,7 @@ function FieldError({ errors }: { errors?: string[] }) {
   );
 }
 
-export function AddCardForm() {
+export function AddCardForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(
     addPaymentMethod,
     initialState,
@@ -59,6 +59,9 @@ export function AddCardForm() {
 
   return (
     <form action={formAction} className="profile-form">
+      {/* Where to go once saved; validated on the server. */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
+
       {state.success ? (
         <div className="alert alert-success" role="status">
           Card saved. Only the last four digits are stored.

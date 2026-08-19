@@ -180,6 +180,26 @@ flutter analyze
 flutter test
 ```
 
+## 💳 Test Cards
+
+Payments go through a stand-in provider, not a bank. It decides the result
+from the last four digits of the card, so the same card behaves the same
+way every time.
+
+| Number | Result |
+| --- | --- |
+| `4242 4242 4242 4242` | Paid (Visa) |
+| `5555 5555 5555 4444` | Paid (Mastercard) |
+| `4000 0000 0000 0002` | Declined |
+| `4000 0000 0000 9995` | Insufficient funds |
+
+The full list, what the card form rejects and how to walk the failure path
+are in [docs/test-cards.md](docs/test-cards.md).
+
+**Never enter a real card number.** These are published test numbers that
+belong to no account. No card number or security code is stored anywhere
+in this project — only the brand, the last four digits and an expiry.
+
 ## 📝 Notes
 
 - Run `python manage.py makemigrations` only after changing a Django model.
@@ -188,6 +208,7 @@ flutter test
 - Run `flutter pub get` after changing `mobile/pubspec.yaml`.
 - Never upload `.env` or real passwords to GitHub.
 - Redis is planned but is not configured yet.
+- Payments are simulated; see [docs/test-cards.md](docs/test-cards.md).
 
 ## 👨‍💻 Author
 

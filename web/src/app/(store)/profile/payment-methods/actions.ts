@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { safeNext } from "@/lib/safe-next";
 
 import { authorizedFetch } from "@/lib/auth";
 
@@ -80,6 +83,14 @@ export async function addPaymentMethod(
   }
 
   revalidatePath("/profile/payment-methods");
+
+  // Somebody sent here from checkout wants to carry on paying, not to
+  // land in their card list.
+  const next = safeNext(getText(formData, "next"));
+  if (next) {
+    redirect(next);
+  }
+
   return { errors: {}, message: "", success: true };
 }
 
