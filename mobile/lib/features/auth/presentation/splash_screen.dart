@@ -1,5 +1,5 @@
-import 'package:ecommerce_mobile/core/theme/app_theme.dart';
 import 'package:ecommerce_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:ecommerce_mobile/shared/widgets/app_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,11 +39,7 @@ class SplashScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Icon(
-              Icons.shopping_bag_outlined,
-              size: 72,
-              color: AppColors.primary,
-            ),
+            AppLogo(size: 80),
             SizedBox(height: 24),
             CircularProgressIndicator(),
           ],
