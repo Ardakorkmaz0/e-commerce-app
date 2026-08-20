@@ -50,6 +50,10 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # Generates every launcher icon size from one source image, so the
+  # dozens of PNGs Android and iOS each want are never edited by hand.
+  flutter_launcher_icons: ^0.14.4
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -91,3 +95,24 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# The site logo, resized into every density Android and iOS ask for.
+# Regenerate with:  dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  # This project has no ios/ folder — it is an Android build only. Turn
+  # this on if an iOS target is ever added, together with the two iOS
+  # settings at the bottom.
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+
+  # Android 8 and later draws a foreground layer over a background and
+  # then crops the pair to the launcher's own mask, so the mark is given
+  # its own transparent image and the cream is a flat colour behind it.
+  adaptive_icon_background: "#FEFBF5"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+  # Only read when ios is true. Kept because iOS forbids transparency in
+  # app icons, so the mark has to be flattened onto the same cream.
+  remove_alpha_ios: true
+  background_color_ios: "#FEFBF5"

@@ -8,6 +8,16 @@ A small e-commerce project with a Django REST backend, Next.js web application, 
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 ![Flutter](https://img.shields.io/badge/Flutter-3.44.9-lightblue)
 
+## 📸 Screenshots
+
+Drop the images in `docs/screenshots/` with these names.
+
+| Web | Mobile |
+| --- | --- |
+| ![Catalog](docs/screenshots/web-catalog.png) | ![Catalog](docs/screenshots/mobile-catalog.png) |
+| ![Product](docs/screenshots/web-product.png) | ![Product](docs/screenshots/mobile-product.png) |
+| ![Checkout](docs/screenshots/web-checkout.png) | ![Orders](docs/screenshots/mobile-orders.png) |
+
 ## 🛠 Tech Stack
 
 - **Backend:** Django REST Framework
@@ -209,6 +219,8 @@ in this project — only the brand, the last four digits and an expiry.
 - Never upload `.env` or real passwords to GitHub.
 - Redis is planned but is not configured yet.
 - Payments are simulated; see [docs/test-cards.md](docs/test-cards.md).
+- The app icon is generated from the site logo; see
+  [docs/app-icon.md](docs/app-icon.md).
 
 ## 👨‍💻 Author
 

@@ -47,6 +47,12 @@ export async function addToCart(
   const productId = Number(getText(formData, "product_id"));
   const quantity = Number(getText(formData, "quantity") || "1");
 
+  // Empty for a product without options, and the API rejects a variant
+  // sent for one of those, so it only travels when the picker set it.
+  const variantId = Number(getText(formData, "variant_id"));
+  const variant =
+    Number.isFinite(variantId) && variantId > 0 ? variantId : null;
+
   if (!Number.isFinite(productId) || productId <= 0) {
     return { message: "That product could not be found.", success: false };
   }
@@ -56,7 +62,11 @@ export async function addToCart(
     response = await authorizedFetch("/cart/items/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: productId, quantity }),
+      body: JSON.stringify({
+        product_id: productId,
+        quantity,
+        ...(variant === null ? {} : { variant_id: variant }),
+      }),
     });
   } catch {
     return { message: "Could not reach the server.", success: false };
