@@ -1,4 +1,3 @@
-# 🛒 VADER - E-Commerce & Inventory Platform
 
 A small e-commerce project with a Django REST backend, Next.js web application, Flutter mobile application, and PostgreSQL database.
 
@@ -10,13 +9,13 @@ A small e-commerce project with a Django REST backend, Next.js web application, 
 
 ## 📸 Screenshots
 
-Drop the images in `docs/screenshots/` with these names.
+<!-- Drop the images in docs/screenshots/ with these names -->
 
 | Web | Mobile |
 | --- | --- |
-| ![Catalog](docs/screenshots/web-catalog.png) | ![Catalog](docs/screenshots/mobile-catalog.png) |
-| ![Product](docs/screenshots/web-product.png) | ![Product](docs/screenshots/mobile-product.png) |
-| ![Checkout](docs/screenshots/web-checkout.png) | ![Orders](docs/screenshots/mobile-orders.png) |
+| <img width="2560" height="1600" alt="Web Catalog" src="https://github.com/user-attachments/assets/49d3034e-7523-41cb-ad5e-bda7515849e5" /> | <img width="1344" height="2992" alt="Mobile Catalog" src="https://github.com/user-attachments/assets/867756fb-c1c9-4f1c-9d86-64339490d739" /> |
+| <img width="1280" height="800" alt="Web Product" src="https://github.com/user-attachments/assets/b602fced-ae97-4495-9e35-ba8e535d2f04" /> | <img width="1344" height="2992" alt="Mobile Product" src="https://github.com/user-attachments/assets/a231991a-ea01-4088-b04c-1bb5dd422c60" /> |
+| <img width="2560" height="1600" alt="Web Checkout" src="https://github.com/user-attachments/assets/cced53a6-53ea-4d29-8120-feaa770caf2e" /> | <img width="1344" height="2992" alt="Mobile Orders" src="https://github.com/user-attachments/assets/51902567-016b-43e0-8bce-891ffbed4a04" /> |
 
 ## 🛠 Tech Stack
 
